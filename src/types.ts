@@ -55,10 +55,15 @@ export interface ThresholdConfig {
 
 export interface SeriesConfig {
   query: string;
+  /** Legend: plain text or Grafana legend format, e.g. `{{instance}} rx` */
   name?: string;
+  /** Fixed colour (used when the query returns a single series) */
   color?: string;
+  /** @deprecated v0.2, use card level `fill_opacity` */
   fill?: boolean;
 }
+
+export type PaletteOption = 'classic' | 'green-yellow-red' | 'blues' | 'greens' | 'reds' | 'purples' | 'single';
 
 export interface PrometheusEntry {
   entry_id: string;
@@ -75,4 +80,8 @@ export interface BaseCardConfig {
   query?: string;
   name?: string;
   refresh_interval?: number;  // seconds, default 30
+  unit?: string;              // Grafana unit id (see utils/units.ts) or custom suffix
+  decimals?: number;          // empty = auto
+  legend_format?: string;     // `{{label}}` template for series labels
+  palette?: PaletteOption;    // colour scheme for multiple series
 }

@@ -2,17 +2,48 @@ import { html } from 'lit';
 import { customElement } from 'lit/decorators.js';
 import { GaugeCardConfig } from './gauge-card-config';
 import { BasePrometheusEditor, EditorSection } from '../../shared/base-editor';
-import { DECIMALS_SCHEMA, ENTRY_SCHEMA, QUERY_SCHEMA, REFRESH_SCHEMA, UNIT_SCHEMA } from '../../shared/editor-utils';
+import {
+  colorModeSchema,
+  DECIMALS_SCHEMA,
+  ENTRY_SCHEMA,
+  LEGEND_FORMAT_SCHEMA,
+  paletteSchema,
+  QUERY_SCHEMA,
+  REFRESH_SCHEMA,
+  UNIT_SCHEMA
+} from '../../shared/editor-utils';
 
 @customElement('prometheus-gauge-card-editor')
 export class GaugeCardEditor extends BasePrometheusEditor<GaugeCardConfig> {
   protected _defaults(): Partial<GaugeCardConfig> {
-    return { min: 0, max: 100, decimals: 1, arc_width: 8, refresh_interval: 30 };
+    return {
+      min: 0,
+      max: 100,
+      arc_width: 8,
+      refresh_interval: 30,
+      show_labels: true,
+      palette: 'classic',
+      color_mode: 'thresholds'
+    };
   }
 
   protected _sections(): EditorSection[] {
     return [
-      { schema: [ENTRY_SCHEMA, QUERY_SCHEMA] },
+      {
+        schema: [
+          ENTRY_SCHEMA,
+          QUERY_SCHEMA,
+          {
+            name: '',
+            type: 'grid',
+            schema: [LEGEND_FORMAT_SCHEMA, { name: 'show_labels', selector: { boolean: {} } }]
+          }
+        ]
+      },
+      {
+        title: 'section_colors',
+        schema: [{ name: '', type: 'grid', schema: [colorModeSchema(this.hass), paletteSchema(this.hass)] }]
+      },
       {
         title: 'section_display',
         schema: [

@@ -67,7 +67,7 @@ export abstract class BasePrometheusEditor<C extends BaseCardConfig> extends Lit
         .hass=${this.hass}
         .items=${config.thresholds || []}
         .schema=${THRESHOLD_SCHEMA}
-        .newItem=${() => ({ value: 0, color: '#4CAF50' })}
+        .newItem=${() => ({ value: 0, color: '#73BF69' })}
         .addLabel=${localize('add_threshold', this.hass)}
         @value-changed=${(ev: CustomEvent) => {
           ev.stopPropagation();

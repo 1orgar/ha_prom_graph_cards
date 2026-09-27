@@ -25,26 +25,80 @@ export const timeseriesStyles = css`
   .legend {
     display: flex;
     flex-wrap: wrap;
-    gap: 16px;
+    gap: 4px 16px;
     padding: 8px 16px 16px;
     font-size: 12px;
+    max-height: var(--legend-max-height, 160px);
+    overflow-y: auto;
   }
   .legend-item {
     display: flex;
     align-items: center;
     gap: 6px;
+    cursor: pointer;
+    user-select: none;
+    min-width: 0;
+  }
+  .legend-item.hidden,
+  tr.hidden {
+    opacity: 0.4;
   }
   .legend-color {
-    width: 12px;
-    height: 12px;
+    width: 14px;
+    height: 4px;
     border-radius: 2px;
+    flex-shrink: 0;
   }
   .legend-name {
     color: var(--secondary-text-color);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .legend-value {
     font-weight: 500;
     color: var(--primary-text-color);
+    white-space: nowrap;
+  }
+  .legend-table-wrap {
+    padding: 4px 16px 12px;
+    max-height: var(--legend-max-height, 200px);
+    overflow: auto;
+  }
+  table.legend-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .legend-table th {
+    text-align: right;
+    font-weight: 500;
+    color: var(--secondary-text-color);
+    padding: 2px 6px;
+    white-space: nowrap;
+  }
+  .legend-table th:first-child,
+  .legend-table td:first-child {
+    text-align: left;
+  }
+  .legend-table td {
+    padding: 2px 6px;
+    text-align: right;
+    white-space: nowrap;
+    border-top: 1px solid var(--divider-color);
+  }
+  .legend-table tr {
+    cursor: pointer;
+  }
+  .legend-table .name-cell {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 260px;
+  }
+  .legend-table .name-cell span:last-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .uplot {
     font-family: inherit;

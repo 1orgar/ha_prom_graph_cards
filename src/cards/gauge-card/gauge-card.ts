@@ -1,29 +1,40 @@
-import { html, css, svg } from 'lit';
+import { html, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { BasePrometheusCard } from '../../shared/base-prometheus-card';
 import { cardStyles } from '../../shared/card-styles';
-import { formatValue } from '../../utils/format';
+import { formatParts, shortLabel } from '../../utils/format';
 import { getThresholdColor } from '../../utils/color';
+import { InstantSeries, itemColor, parseInstant } from '../../utils/series';
 import { GaugeCardConfig } from './gauge-card-config';
+import { gaugeStyles } from './gauge-card-styles';
+import { localize } from '../../localize';
 import './gauge-card-editor';
+
+const RADIUS = 40;
+const CIRCUMFERENCE = Math.PI * RADIUS;
 
 @customElement('prometheus-gauge-card')
 export class GaugeCard extends BasePrometheusCard<GaugeCardConfig> {
-  @state() private _currentValue: number | null = null;
+  @state() private _items: InstantSeries[] = [];
+  @state() private _loaded = false;
+
+  static get styles() {
+    return [cardStyles, gaugeStyles];
+  }
 
   static getStubConfig(): Partial<GaugeCardConfig> {
     return {
       type: 'custom:prometheus-gauge-card',
       name: 'Prometheus targets up',
       query: 'avg(up) * 100',
-      unit: '%',
+      unit: 'percent',
       min: 0,
       max: 100,
       decimals: 0,
       thresholds: [
-        { value: 0, color: '#F44336' },
-        { value: 50, color: '#FFC107' },
-        { value: 90, color: '#4CAF50' }
+        { value: 0, color: '#F2495C' },
+        { value: 50, color: '#FADE2A' },
+        { value: 90, color: '#73BF69' }
       ]
     };
   }
@@ -35,155 +46,89 @@ export class GaugeCard extends BasePrometheusCard<GaugeCardConfig> {
   protected async _fetchData() {
     try {
       this._loading = true;
-      const result = await this._client.instantQuery(this._config.query!);
-      if (result?.data?.result?.length > 0 && result.data.result[0].value) {
-        this._currentValue = parseFloat(result.data.result[0].value[1]);
-      } else {
-        this._currentValue = null;
-      }
+      const res = await this._client.instantQuery(this._config.query!);
+      this._items = parseInstant(res, this._config.legend_format).map((s) => ({
+        ...s,
+        label: shortLabel(s.metric, this._config.legend_format)
+      }));
       this._error = undefined;
     } catch (e: any) {
       this._error = this._formatError(e);
     } finally {
       this._loading = false;
+      this._loaded = true;
     }
   }
 
-  render() {
-    const config = this._config;
-    if (!this._hasQuery()) {
-      return this.renderPlaceholder();
+  private _color(value: number | null, index: number, total: number): string {
+    const c = this._config;
+    if (c.color_mode === 'series' || (!c.thresholds?.length && total > 1)) {
+      return itemColor(index, total, c.palette);
     }
-    if (this._error) {
-      return this.renderError();
-    }
-    if (this._loading && this._currentValue === null) {
-      return this.renderLoading();
-    }
-    
-    const min = config.min !== undefined ? config.min : 0;
-    const max = config.max !== undefined ? config.max : 100;
-    const decimals = config.decimals !== undefined ? config.decimals : 1;
-    const arcWidth = config.arc_width !== undefined ? config.arc_width : 8;
-    
-    const val = this._currentValue !== null ? this._currentValue : min;
-    const clampedVal = Math.min(Math.max(val, min), max);
-    
-    // Semi-circle math
-    const radius = 40;
-    const circumference = Math.PI * radius;
-    const fraction = max > min ? (clampedVal - min) / (max - min) : 0;
-    const dashoffset = circumference * (1 - fraction);
-    
-    const color = getThresholdColor(this._currentValue ?? min, config.thresholds || []);
-    const displayValue = this._currentValue !== null ? formatValue(this._currentValue, decimals) : '-';
-    
+    return getThresholdColor(value ?? c.min ?? 0, c.thresholds || [], itemColor(index, total, c.palette));
+  }
+
+  private _renderGauge(item: InstantSeries, index: number, total: number) {
+    const c = this._config;
+    const min = c.min ?? 0;
+    const max = c.max ?? 100;
+    const arcWidth = c.arc_width ?? 8;
+    const val = item.value ?? min;
+    const clamped = Math.min(Math.max(val, min), max);
+    const fraction = max > min ? (clamped - min) / (max - min) : 0;
+    const color = this._color(item.value, index, total);
+    const f = formatParts(item.value, c.unit, c.decimals);
+    const minText = formatParts(min, c.unit, 0);
+    const maxText = formatParts(max, c.unit, 0);
+    const showLabel = total > 1 && c.show_labels !== false;
+
     return html`
-      <ha-card>
-        ${config.name ? html`<div class="name">${config.name}</div>` : ''}
-        
+      <div class="gauge">
         <div class="gauge-container">
           <svg viewBox="0 0 100 60" class="gauge-svg">
-            <path
-              class="arc-bg"
-              d="M 10 50 A 40 40 0 0 1 90 50"
-              fill="none"
-              stroke-width="${arcWidth}"
-              stroke-linecap="round"
-            ></path>
-            
-            <path
-              class="arc-fg"
-              d="M 10 50 A 40 40 0 0 1 90 50"
-              fill="none"
-              stroke="${color}"
-              stroke-width="${arcWidth}"
-              stroke-linecap="round"
-              stroke-dasharray="${circumference}"
-              stroke-dashoffset="${dashoffset}"
-            ></path>
+            <path class="arc-bg" d="M 10 50 A 40 40 0 0 1 90 50" fill="none"
+              stroke-width="${arcWidth}" stroke-linecap="round"></path>
+            <path class="arc-fg" d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="${color}"
+              stroke-width="${arcWidth}" stroke-linecap="round"
+              stroke-dasharray="${CIRCUMFERENCE}" stroke-dashoffset="${CIRCUMFERENCE * (1 - fraction)}"></path>
           </svg>
-          
           <div class="value-container">
-            <span class="value">${displayValue}</span>
-            ${config.unit ? html`<span class="unit">${config.unit}</span>` : ''}
+            <span class="value">${f.prefix}${f.text}</span>
+            ${f.suffix.trim() ? html`<span class="unit">${f.suffix.trim()}</span>` : nothing}
           </div>
-          
           <div class="labels">
-            <span class="min-label">${min}</span>
-            <span class="max-label">${max}</span>
+            <span>${minText.prefix}${minText.text}</span>
+            <span>${maxText.prefix}${maxText.text}${maxText.suffix}</span>
           </div>
         </div>
+        ${showLabel ? html`<div class="series-label" title=${item.label}>${item.label}</div>` : nothing}
+      </div>
+    `;
+  }
+
+  render() {
+    const c = this._config;
+    if (!this._hasQuery()) return this.renderPlaceholder();
+    if (this._error) return this.renderError();
+    if (!this._loaded) return this.renderLoading();
+
+    const items = this._items.length ? this._items : [{ metric: {}, label: '', value: null }];
+    const many = items.length > 1;
+    const style = many ? '--gauge-min: 110px; --gauge-font: 20px' : '--gauge-min: 180px';
+
+    return html`
+      <ha-card>
+        ${c.name ? html`<div class="name">${c.name}</div>` : nothing}
+        ${this._loaded && !this._items.length
+          ? html`<div class="placeholder-state">${localize('no_data', this._hass)}</div>`
+          : html`<div class="gauges" style=${style}>
+              ${items.map((item, i) => this._renderGauge(item, i, items.length))}
+            </div>`}
       </ha-card>
     `;
   }
 
-  static get styles() {
-    return [
-      cardStyles,
-      css`
-        ha-card {
-          padding: 16px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 16px;
-        }
-        .name {
-          font-size: 14px;
-          color: var(--secondary-text-color);
-          font-weight: 500;
-          align-self: flex-start;
-        }
-        .gauge-container {
-          position: relative;
-          width: 100%;
-          max-width: 250px;
-          aspect-ratio: 100 / 60;
-        }
-        .gauge-svg {
-          width: 100%;
-          height: 100%;
-        }
-        .arc-bg {
-          stroke: var(--divider-color, #e0e0e0);
-        }
-        .arc-fg {
-          transition: stroke-dashoffset 0.5s ease-in-out, stroke 0.5s ease-in-out;
-        }
-        .value-container {
-          position: absolute;
-          bottom: 10%;
-          left: 50%;
-          transform: translateX(-50%);
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-        }
-        .value {
-          font-size: 28px;
-          font-weight: 400;
-          color: var(--primary-text-color);
-          line-height: 1;
-        }
-        .unit {
-          font-size: 14px;
-          color: var(--secondary-text-color);
-        }
-        .labels {
-          position: absolute;
-          bottom: 0;
-          width: 100%;
-          display: flex;
-          justify-content: space-between;
-          padding: 0 5%;
-          box-sizing: border-box;
-        }
-        .min-label, .max-label {
-          font-size: 12px;
-          color: var(--secondary-text-color);
-        }
-      `
-    ];
+  public getCardSize(): number {
+    return this._items.length > 2 ? 5 : 3;
   }
 }

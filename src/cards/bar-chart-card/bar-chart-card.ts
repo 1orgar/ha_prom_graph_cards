@@ -4,8 +4,9 @@ import { BasePrometheusCard } from '../../shared/base-prometheus-card';
 import { cardStyles } from '../../shared/card-styles';
 import { BarChartCardConfig } from './bar-chart-card-config';
 import { barChartStyles } from './bar-chart-card-styles';
-import { formatValue } from '../../utils/format';
+import { formatValue, shortLabel } from '../../utils/format';
 import { getThresholdColor } from '../../utils/color';
+import { itemColor, parseInstant } from '../../utils/series';
 import { localize } from '../../localize';
 import './bar-chart-card-editor';
 
@@ -13,6 +14,7 @@ interface BarData {
   label: string;
   value: number;
   color: string;
+  explicitColor?: string;
 }
 
 @customElement('prometheus-bar-card')
@@ -41,39 +43,54 @@ export class BarChartCard extends BasePrometheusCard<BarChartCardConfig> {
     return document.createElement('prometheus-bar-card-editor');
   }
 
+  /** All queries: main `query` + optional extra `series`. */
+  private _queries(): { query: string; name?: string; color?: string }[] {
+    const list: { query: string; name?: string; color?: string }[] = [];
+    if (this._config.query?.trim()) list.push({ query: this._config.query, name: this._config.legend_format });
+    for (const s of this._config.series || []) {
+      if (s?.query?.trim()) list.push(s);
+    }
+    return list;
+  }
+
+  protected _hasQuery(): boolean {
+    return this._queries().length > 0;
+  }
+
   protected async _fetchData(): Promise<void> {
+    const c = this._config;
     try {
       this._loading = true;
-      const response = await this._client.instantQuery(this._config.query!);
-      const results = response?.data?.result || [];
-      const data: BarData[] = [];
-      let maxVal = 0;
+      const queries = this._queries();
+      const responses = await Promise.all(queries.map((q) => this._client.instantQuery(q.query)));
+      let data: BarData[] = [];
 
-      for (const res of results) {
-        let label = 'Value';
-        if (this._config.group_by && res.metric[this._config.group_by]) {
-          label = res.metric[this._config.group_by];
-        } else {
-          const keys = Object.keys(res.metric).filter((k) => k !== '__name__');
-          if (keys.length > 0) {
-            label = res.metric[keys[0]];
-          } else if (res.metric.__name__) {
-            label = res.metric.__name__;
-          }
+      responses.forEach((res, qi) => {
+        const q = queries[qi];
+        const template = q.name && q.name.includes('{{') ? q.name : undefined;
+        const series = parseInstant(res, template);
+        for (const s of series) {
+          if (s.value === null) continue;
+          let label = shortLabel(s.metric, template, c.group_by);
+          // plain-text name: prefix labels when the query returns many series
+          if (q.name && !template) label = series.length > 1 ? `${q.name} ${label}` : q.name;
+          data.push({ label, value: s.value, color: '', explicitColor: series.length === 1 ? q.color : undefined });
         }
+      });
 
-        const value = res.value ? parseFloat(res.value[1]) : 0;
-        if (!Number.isFinite(value)) continue;
-        if (value > maxVal) maxVal = value;
-        data.push({ label, value, color: 'var(--primary-color)' });
-      }
+      const sort = c.sort || 'desc';
+      if (sort === 'desc') data.sort((a, b) => b.value - a.value);
+      else if (sort === 'asc') data.sort((a, b) => a.value - b.value);
+      else if (sort === 'name') data.sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
+      if (c.limit && c.limit > 0) data = data.slice(0, c.limit);
 
-      data.sort((a, b) => b.value - a.value);
-      this._calculatedMax = this._config.max || maxVal || 100;
+      const maxVal = data.reduce((m, d) => Math.max(m, d.value), 0);
+      this._calculatedMax = c.max || maxVal || 100;
 
-      const thresholds = this._config.thresholds || [];
-      data.forEach((d) => {
-        d.color = thresholds.length ? getThresholdColor(d.value, thresholds) : 'var(--primary-color)';
+      const byThreshold = c.color_mode !== 'series' && c.thresholds?.length;
+      data.forEach((d, i) => {
+        const paletteColor = itemColor(i, data.length, c.palette, d.explicitColor);
+        d.color = byThreshold ? getThresholdColor(d.value, c.thresholds!, paletteColor) : paletteColor;
       });
 
       this._barData = data;
@@ -111,7 +128,7 @@ export class BarChartCard extends BasePrometheusCard<BarChartCardConfig> {
   }
 
   private _fmt(value: number): string {
-    return formatValue(value, this._config.decimals ?? 2, this._config.unit);
+    return formatValue(value, this._config.decimals, this._config.unit);
   }
 
   private _renderBars() {

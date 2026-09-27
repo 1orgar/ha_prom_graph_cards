@@ -1,5 +1,7 @@
 import { css } from 'lit';
-import { HaFormSchema, INTEGRATION_DOMAIN } from '../types';
+import { HaFormSchema, HomeAssistant, INTEGRATION_DOMAIN } from '../types';
+import { unitSelectOptions } from '../utils/format';
+import { localize } from '../localize';
 
 export const editorStyles = css`
   .card-config {
@@ -100,9 +102,40 @@ export const DECIMALS_SCHEMA: HaFormSchema = {
   selector: { number: { min: 0, max: 6, step: 1, mode: 'box' } }
 };
 
+/** Grafana-like unit picker; `custom_value` keeps free-form suffixes possible. */
 export const UNIT_SCHEMA: HaFormSchema = {
   name: 'unit',
+  selector: { select: { mode: 'dropdown', custom_value: true, options: unitSelectOptions() } }
+};
+
+export const LEGEND_FORMAT_SCHEMA: HaFormSchema = {
+  name: 'legend_format',
   selector: { text: {} }
 };
+
+export function paletteSchema(hass?: HomeAssistant): HaFormSchema {
+  const options = ['classic', 'green-yellow-red', 'blues', 'greens', 'reds', 'purples', 'single'];
+  return {
+    name: 'palette',
+    selector: {
+      select: {
+        mode: 'dropdown',
+        options: options.map((value) => ({ value, label: localize(`palette_${value}`, hass) }))
+      }
+    }
+  };
+}
+
+export function colorModeSchema(hass?: HomeAssistant): HaFormSchema {
+  return {
+    name: 'color_mode',
+    selector: {
+      select: {
+        mode: 'dropdown',
+        options: ['thresholds', 'series'].map((value) => ({ value, label: localize(`color_mode_${value}`, hass) }))
+      }
+    }
+  };
+}
 
 export const TIME_RANGE_OPTIONS = ['15m', '30m', '1h', '3h', '6h', '12h', '24h', '2d', '7d', '30d'];

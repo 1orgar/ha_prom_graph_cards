@@ -1,7 +1,7 @@
 # Prometheus Graph Cards for Home Assistant
 
 <p align="center">
-  <img src="images/icon.jpg" alt="Prometheus Graph Cards" width="150" height="150" style="border-radius: 20px;">
+  <img src="images/icon.png" alt="Prometheus Graph Cards" width="150" height="150" style="border-radius: 20px;">
 </p>
 
 <p align="center">
@@ -20,6 +20,9 @@ Grafana-style dashboard cards for Home Assistant, powered by PromQL.
 - 📊 **4 cards** — Stat, Gauge, Time Series (uPlot), Bar Chart
 - 🧩 **Listed in the card picker** — *Add card → Custom / Community*
 - 🛠️ **Fully visual editor** — every option, thresholds and series are editable in the UI, no YAML needed
+- 🔢 **Multi-series everywhere** — a query returning many series draws many lines / stat rows / gauges / bars
+- 🎨 **Grafana palettes** — classic palette + by-series schemes, Grafana-like legend (`{{label}}` format, table with min/max/mean, click to isolate)
+- 📏 **Grafana units** — pick a unit from a list (bytes IEC/SI, bits/s, s → min → hour, W → kW, %, °C, ₽ …), values are scaled within the dimension
 - 🔌 **Multiple Prometheus servers** — pick a server from a dropdown in the editor
 - 🌍 English / Русский
 
@@ -53,14 +56,21 @@ Everything is configured in the visual editor.
 <details>
 <summary>YAML reference (optional)</summary>
 
-Common options: `entry_id` (server, empty = first configured), `query`, `name`, `refresh_interval` (s, default 30).
+Common options: `entry_id` (server, empty = first configured), `query`, `name`, `refresh_interval` (s, default 30),
+`unit` (Grafana unit id: `bytes`, `decbytes`, `bps`, `binBps`, `s`, `ms`, `dtdurations`, `percent`, `percentunit`,
+`watt`, `kwatth`, `celsius`, `short`, … or any custom suffix), `decimals` (empty = auto),
+`legend_format` (`{{instance}} {{job}}`), `palette` (`classic`, `green-yellow-red`, `blues`, `greens`, `reds`, `purples`, `single`).
+
+Several series per query: Stat — `reduce: none | sum | avg | min | max`; Gauge — one gauge per series;
+Bar — one bar per series, extra queries in `series:`; Time series — one line per series.
 
 ```yaml
 type: custom:prometheus-stat-card
 query: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100
 name: RAM available
 icon: mdi:memory
-unit: '%'
+unit: percent
+line_width: 2
 decimals: 1
 sparkline: true
 sparkline_hours: 24
@@ -82,15 +92,17 @@ max: 8
 type: custom:prometheus-timeseries-card
 title: Network traffic
 time_range: 6h
-unit: bps
+unit: binBps
+fill: true
+fill_opacity: 15
+line_width: 1.5
+legend_mode: table
+legend_values: [last, max, mean]
 series:
-  - query: rate(node_network_receive_bytes_total{device="eth0"}[5m]) * 8
-    name: RX
-    color: '#4CAF50'
-    fill: true
-  - query: rate(node_network_transmit_bytes_total{device="eth0"}[5m]) * 8
-    name: TX
-    color: '#2196F3'
+  - query: rate(node_network_receive_bytes_total{device!="lo"}[5m])
+    name: '{{device}} rx'
+  - query: rate(node_network_transmit_bytes_total{device!="lo"}[5m])
+    name: '{{device}} tx'
 ```
 
 ```yaml
@@ -98,7 +110,7 @@ type: custom:prometheus-bar-card
 query: 100 - node_filesystem_avail_bytes / node_filesystem_size_bytes * 100
 name: Disk usage
 group_by: mountpoint
-unit: '%'
+unit: percent
 max: 100
 ```
 

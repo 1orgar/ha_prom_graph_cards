@@ -7,21 +7,25 @@ import { BasePrometheusCard } from '../../shared/base-prometheus-card';
 import { cardStyles } from '../../shared/card-styles';
 import { TimeseriesCardConfig } from './timeseries-card-config';
 import { timeseriesStyles } from './timeseries-card-styles';
+import { buildChartData, ChartData, ChartSeries, toAligned } from './timeseries-data';
 import { formatValue } from '../../utils/format';
-import { DEFAULT_SERIES_COLORS } from '../../utils/color';
+import { withAlpha } from '../../utils/color';
 import { parseTimeRange, calculateStep } from '../../utils/time';
 import { localize } from '../../localize';
 import './timeseries-card-editor';
 
+type LegendStat = 'last' | 'min' | 'max' | 'mean';
+
 @customElement('prometheus-timeseries-card')
 export class TimeseriesCard extends BasePrometheusCard<TimeseriesCardConfig> {
-  @state() private _chartData: uPlot.AlignedData = [[]];
-  @state() private _currentValues: Record<number, number | null> = {};
-  @state() private _hasData = false;
+  @state() private _data: ChartData = { times: [], series: [] };
+  @state() private _cursorIdx: number | null = null;
+  @state() private _hidden = new Set<string>();
 
   @query('.chart-container') private _chartContainer?: HTMLElement;
 
   private _chart?: uPlot;
+  private _chartSignature = '';
   private _resizeObserver?: ResizeObserver;
 
   static get styles() {
@@ -33,7 +37,7 @@ export class TimeseriesCard extends BasePrometheusCard<TimeseriesCardConfig> {
       type: 'custom:prometheus-timeseries-card',
       title: 'Prometheus',
       time_range: '1h',
-      series: [{ query: 'sum(up)', name: 'Targets up' }]
+      series: [{ query: 'up', name: '{{job}} {{instance}}' }]
     };
   }
 
@@ -44,7 +48,6 @@ export class TimeseriesCard extends BasePrometheusCard<TimeseriesCardConfig> {
   public setConfig(config: TimeseriesCardConfig): void {
     const series = Array.isArray(config.series) ? config.series : [];
     super.setConfig({ ...config, series });
-    // Structure (series/colors/height) may have changed, rebuild chart
     this._destroyChart();
   }
 
@@ -63,11 +66,21 @@ export class TimeseriesCard extends BasePrometheusCard<TimeseriesCardConfig> {
 
   protected updated(changedProps: PropertyValues): void {
     super.updated(changedProps);
-    if (this._chartContainer && !this._chart && this._hasData) {
+    if (!this._data.times.length || !this._chartContainer) return;
+    // Rebuild when the set of series changes, otherwise just update data
+    const signature = this._data.series.map((s) => `${s.key}|${s.color}`).join(',');
+    if (!this._chart || signature !== this._chartSignature) {
+      this._destroyChart();
+      this._chartSignature = signature;
       this._initChart();
-    } else if (this._chart && changedProps.has('_chartData')) {
-      this._chart.setData(this._chartData);
+    } else if (changedProps.has('_data') || changedProps.has('_hidden')) {
+      this._chart.setData(this._aligned());
+      this._data.series.forEach((s, i) => this._chart!.setSeries(i + 1, { show: !this._hidden.has(s.key) }));
     }
+  }
+
+  private _aligned(): uPlot.AlignedData {
+    return toAligned(this._data, Boolean(this._config.stacked), this._hidden);
   }
 
   private _destroyChart() {
@@ -75,6 +88,7 @@ export class TimeseriesCard extends BasePrometheusCard<TimeseriesCardConfig> {
     this._resizeObserver = undefined;
     this._chart?.destroy();
     this._chart = undefined;
+    this._chartSignature = '';
   }
 
   /** Canvas cannot use CSS variables, resolve them to real colors. */
@@ -82,54 +96,42 @@ export class TimeseriesCard extends BasePrometheusCard<TimeseriesCardConfig> {
     return getComputedStyle(this).getPropertyValue(name).trim() || fallback;
   }
 
-  private _seriesColor(index: number): string {
-    const s = this._config.series[index];
-    return (s && s.color) || DEFAULT_SERIES_COLORS[index % DEFAULT_SERIES_COLORS.length];
-  }
-
-  private _latest(column: (number | null | undefined)[]): number | null {
-    for (let i = column.length - 1; i >= 0; i--) {
-      const v = column[i];
-      if (v !== null && v !== undefined) return v;
-    }
-    return null;
+  private _fmt(v: number | null | undefined): string {
+    return v === null || v === undefined ? '-' : formatValue(v, this._config.decimals, this._config.unit);
   }
 
   private _initChart() {
     if (!this._chartContainer || !this._config) return;
-
+    const c = this._config;
     const width = this._chartContainer.clientWidth || 400;
-    const height = this._config.height || 200;
+    const height = c.height || 200;
     const textColor = this._cssVar('--secondary-text-color', '#888');
     const gridColor = this._cssVar('--divider-color', 'rgba(127,127,127,0.2)');
+    const lineWidth = c.line_width ?? 2;
+    const fillOn = c.fill || c.stacked || c.series.some((s) => s.fill);
+    const opacity = Math.max(0, Math.min(100, c.fill_opacity ?? 20)) / 100;
 
     const series: uPlot.Series[] = [{}];
-    this._config.series.forEach((s, i) => {
-      const color = this._seriesColor(i);
-      const fill = s.fill ?? this._config.fill;
+    this._data.series.forEach((s) => {
       series.push({
-        label: s.name || `Series ${i + 1}`,
-        stroke: color,
-        width: 2,
-        fill: fill && /^#[0-9a-f]{6}$/i.test(color) ? `${color}33` : undefined,
+        label: s.label,
+        stroke: s.color,
+        width: lineWidth,
+        fill: fillOn ? withAlpha(s.color, opacity) : undefined,
         spanGaps: true,
+        show: !this._hidden.has(s.key),
         points: { show: false }
       });
     });
 
     const axes: uPlot.Axis[] = [
+      { stroke: textColor, grid: { stroke: gridColor, width: 1 }, ticks: { stroke: gridColor, width: 1 } },
       {
         stroke: textColor,
-        grid: { stroke: gridColor, width: 1 },
-        ticks: { stroke: gridColor, width: 1 }
-      },
-      {
-        stroke: textColor,
-        size: 60,
+        size: 70,
         grid: { stroke: gridColor, width: 1 },
         ticks: { stroke: gridColor, width: 1 },
-        values: (_u, vals) =>
-          vals.map((v) => (v == null ? '' : formatValue(v, this._config.decimals ?? 2, this._config.unit)))
+        values: (_u, vals) => vals.map((v) => (v == null ? '' : this._fmt(v)))
       }
     ];
 
@@ -139,24 +141,22 @@ export class TimeseriesCard extends BasePrometheusCard<TimeseriesCardConfig> {
       series,
       axes,
       legend: { show: false },
+      scales: {
+        y: {
+          range: (_u, dmin, dmax) => {
+            const min = c.min ?? (c.stacked ? Math.min(0, dmin) : dmin);
+            const max = c.max ?? dmax;
+            return min === max ? [min - 1, max + 1] : [min, max];
+          }
+        }
+      },
       cursor: { points: { size: 6 } },
       hooks: {
-        setCursor: [
-          (u) => {
-            const idx = u.cursor.idx;
-            const values: Record<number, number | null> = {};
-            for (let i = 1; i < u.series.length; i++) {
-              const column = u.data[i] as (number | null | undefined)[];
-              values[i - 1] = idx != null ? (column[idx] ?? null) : this._latest(column);
-            }
-            this._currentValues = values;
-          }
-        ]
+        setCursor: [(u) => (this._cursorIdx = u.cursor.idx ?? null)]
       }
     };
 
-    this._chart = new uPlot(opts, this._chartData, this._chartContainer);
-
+    this._chart = new uPlot(opts, this._aligned(), this._chartContainer);
     this._resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
         if (entry.target === this._chartContainer && this._chart && entry.contentRect.width > 0) {
@@ -168,44 +168,17 @@ export class TimeseriesCard extends BasePrometheusCard<TimeseriesCardConfig> {
   }
 
   protected async _fetchData(): Promise<void> {
-    const seriesConfig = this._config.series;
+    const queries = this._config.series;
     try {
       this._loading = true;
       const { start, end } = parseTimeRange(this._config.time_range || '1h');
       const step = this._config.step ? String(this._config.step) : calculateStep(start, end);
-
-      const results = await Promise.all(
-        seriesConfig.map((s) =>
+      const responses = await Promise.all(
+        queries.map((s) =>
           s.query && s.query.trim() ? this._client.rangeQuery(s.query, start, end, step) : Promise.resolve(null)
         )
       );
-
-      const timeMap = new Map<number, (number | null)[]>();
-      results.forEach((res, sIdx) => {
-        const values = res?.data?.result?.[0]?.values || [];
-        for (const [t, raw] of values) {
-          if (!timeMap.has(t)) {
-            timeMap.set(t, new Array(seriesConfig.length).fill(null));
-          }
-          const val = parseFloat(raw);
-          timeMap.get(t)![sIdx] = Number.isFinite(val) ? val : null;
-        }
-      });
-
-      const times = Array.from(timeMap.keys()).sort((a, b) => a - b);
-      const aligned: uPlot.AlignedData = [times];
-      for (let i = 0; i < seriesConfig.length; i++) {
-        aligned.push(times.map((t) => timeMap.get(t)![i]));
-      }
-
-      const latest: Record<number, number | null> = {};
-      for (let i = 0; i < seriesConfig.length; i++) {
-        latest[i] = this._latest(aligned[i + 1] as (number | null)[]);
-      }
-
-      this._currentValues = latest;
-      this._chartData = aligned;
-      this._hasData = times.length > 0;
+      this._data = buildChartData(responses, queries, this._config.palette, this._config.legend_format);
       this._error = undefined;
     } catch (e: any) {
       this._error = this._formatError(e);
@@ -214,16 +187,34 @@ export class TimeseriesCard extends BasePrometheusCard<TimeseriesCardConfig> {
     }
   }
 
+  private _toggle(key: string, ev: MouseEvent) {
+    const next = new Set(this._hidden);
+    const all = this._data.series.map((s) => s.key);
+    if (ev.ctrlKey || ev.metaKey || ev.shiftKey) {
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+    } else {
+      // Grafana behaviour: click isolates a series, click again shows all
+      const isolated = next.size === all.length - 1 && !next.has(key);
+      next.clear();
+      if (!isolated) all.filter((k) => k !== key).forEach((k) => next.add(k));
+    }
+    this._hidden = next;
+  }
+
+  private _current(s: ChartSeries): number | null {
+    return this._cursorIdx !== null ? s.values[this._cursorIdx] ?? null : s.stats.last;
+  }
+
 
   protected render() {
-    if (!this._hasQuery()) {
-      return this.renderPlaceholder('no_series');
-    }
+    if (!this._hasQuery()) return this.renderPlaceholder('no_series');
+    const hasData = this._data.times.length > 0;
 
     let overlay: unknown = nothing;
     if (this._error) {
       overlay = html`<div class="overlay error-state">${this._error}</div>`;
-    } else if (!this._hasData) {
+    } else if (!hasData) {
       overlay = html`<div class="overlay">
         ${this._loading
           ? html`<div class="loading-state"></div>`
@@ -234,28 +225,68 @@ export class TimeseriesCard extends BasePrometheusCard<TimeseriesCardConfig> {
     return html`
       <ha-card>
         ${this._config.title ? html`<div class="header">${this._config.title}</div>` : nothing}
-        <div class="chart-container" style="min-height: ${this._hasData ? this._config.height || 200 : 0}px"></div>
+        <div class="chart-container" style="min-height: ${hasData ? this._config.height || 200 : 0}px"></div>
         ${overlay}
-        ${this._config.show_legend !== false && this._hasData ? this._renderLegend() : nothing}
+        ${this._config.show_legend !== false && hasData ? this._renderLegend() : nothing}
       </ha-card>
     `;
   }
 
+  private _renderLegendTable(stats: LegendStat[]) {
+    const cols = stats.length ? stats : (['last'] as LegendStat[]);
+    return html`
+      <div class="legend-table-wrap">
+        <table class="legend-table">
+          <thead>
+            <tr>
+              <th></th>
+              ${cols.map((st) => html`<th>${localize(`legend_value_${st}`, this._hass)}</th>`)}
+            </tr>
+          </thead>
+          <tbody>
+            ${this._data.series.map(
+              (s) => html`
+                <tr class=${this._hidden.has(s.key) ? 'hidden' : ''} @click=${(e: MouseEvent) => this._toggle(s.key, e)}>
+                  <td>
+                    <div class="name-cell" title=${s.label}>
+                      <span class="legend-color" style="background:${s.color}"></span><span>${s.label}</span>
+                    </div>
+                  </td>
+                  ${cols.map((st) => html`<td>${this._fmt(st === 'last' ? this._current(s) : s.stats[st])}</td>`)}
+                </tr>
+              `
+            )}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
   private _renderLegend() {
+    const stats = (this._config.legend_values || []) as LegendStat[];
+    if (this._config.legend_mode === 'table') return this._renderLegendTable(stats);
     return html`
       <div class="legend">
-        ${this._config.series.map((s, i) => {
-          const val = this._currentValues[i];
-          const formatted =
-            val !== null && val !== undefined ? formatValue(val, this._config.decimals ?? 2, this._config.unit) : '-';
-          return html`
-            <div class="legend-item">
-              <div class="legend-color" style="background-color: ${this._seriesColor(i)}"></div>
-              <span class="legend-name">${s.name || `Series ${i + 1}`}</span>
-              <span class="legend-value">${formatted}</span>
+        ${this._data.series.map(
+          (s) => html`
+            <div
+              class="legend-item ${this._hidden.has(s.key) ? 'hidden' : ''}"
+              title=${s.label}
+              @click=${(e: MouseEvent) => this._toggle(s.key, e)}
+            >
+              <div class="legend-color" style="background-color: ${s.color}"></div>
+              <span class="legend-name">${s.label}</span>
+              ${stats.length
+                ? stats.map(
+                    (st) => html`<span class="legend-value"
+                      >${localize(`legend_value_${st}`, this._hass)}:
+                      ${this._fmt(st === 'last' ? this._current(s) : s.stats[st])}</span
+                    >`
+                  )
+                : html`<span class="legend-value">${this._fmt(this._current(s))}</span>`}
             </div>
-          `;
-        })}
+          `
+        )}
       </div>
     `;
   }
