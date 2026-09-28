@@ -44,7 +44,7 @@ export const gaugeStyles = css`
   }
   .value-container {
     position: absolute;
-    bottom: 12%;
+    bottom: 4%;
     left: 50%;
     transform: translateX(-50%);
     display: flex;
@@ -60,17 +60,6 @@ export const gaugeStyles = css`
   }
   .unit {
     font-size: calc(var(--gauge-font, 28px) * 0.5);
-    color: var(--secondary-text-color);
-  }
-  .labels {
-    position: absolute;
-    bottom: 0;
-    width: 100%;
-    display: flex;
-    justify-content: space-between;
-    padding: 0 5%;
-    box-sizing: border-box;
-    font-size: 11px;
     color: var(--secondary-text-color);
   }
   .series-label {

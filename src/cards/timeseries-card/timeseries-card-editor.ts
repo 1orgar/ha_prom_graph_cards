@@ -3,11 +3,10 @@ import { customElement } from 'lit/decorators.js';
 import { TimeseriesCardConfig } from './timeseries-card-config';
 import { BasePrometheusEditor, EditorSection } from '../../shared/base-editor';
 import {
+  advancedSection,
   DECIMALS_SCHEMA,
   ENTRY_SCHEMA,
-  LEGEND_FORMAT_SCHEMA,
   paletteSchema,
-  REFRESH_SCHEMA,
   TIME_RANGE_OPTIONS,
   UNIT_SCHEMA
 } from '../../shared/editor-utils';
@@ -102,7 +101,8 @@ export class TimeseriesCardEditor extends BasePrometheusEditor<TimeseriesCardCon
               {
                 name: 'legend_mode',
                 selector: { select: { mode: 'dropdown', options: this._options('legend_mode_', ['list', 'table']) } }
-              }
+              },
+              { name: 'show_current', selector: { boolean: {} } }
             ]
           },
           {
@@ -110,14 +110,10 @@ export class TimeseriesCardEditor extends BasePrometheusEditor<TimeseriesCardCon
             selector: {
               select: { multiple: true, mode: 'list', options: this._options('legend_value_', ['last', 'min', 'max', 'mean']) }
             }
-          },
-          LEGEND_FORMAT_SCHEMA
+          }
         ]
       },
-      {
-        title: 'section_advanced',
-        schema: [{ name: '', type: 'grid', schema: [REFRESH_SCHEMA, { name: 'step', selector: { text: {} } }] }]
-      }
+      advancedSection({ name: 'step', selector: { text: {} } })
     ];
   }
 

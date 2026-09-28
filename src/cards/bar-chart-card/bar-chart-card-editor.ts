@@ -3,13 +3,13 @@ import { customElement } from 'lit/decorators.js';
 import { BarChartCardConfig } from './bar-chart-card-config';
 import { BasePrometheusEditor, EditorSection } from '../../shared/base-editor';
 import {
+  advancedSection,
   colorModeSchema,
   DECIMALS_SCHEMA,
   ENTRY_SCHEMA,
   LEGEND_FORMAT_SCHEMA,
   paletteSchema,
   QUERY_SCHEMA,
-  REFRESH_SCHEMA,
   UNIT_SCHEMA
 } from '../../shared/editor-utils';
 import { localize } from '../../localize';
@@ -51,11 +51,7 @@ export class BarChartCardEditor extends BasePrometheusEditor<BarChartCardConfig>
         schema: [
           ENTRY_SCHEMA,
           QUERY_SCHEMA,
-          {
-            name: '',
-            type: 'grid',
-            schema: [LEGEND_FORMAT_SCHEMA, { name: 'group_by', selector: { text: {} } }]
-          }
+          LEGEND_FORMAT_SCHEMA
         ]
       },
       {
@@ -88,7 +84,7 @@ export class BarChartCardEditor extends BasePrometheusEditor<BarChartCardConfig>
         title: 'section_colors',
         schema: [{ name: '', type: 'grid', schema: [colorModeSchema(this.hass), paletteSchema(this.hass)] }]
       },
-      { title: 'section_advanced', schema: [REFRESH_SCHEMA] }
+      advancedSection()
     ];
   }
 

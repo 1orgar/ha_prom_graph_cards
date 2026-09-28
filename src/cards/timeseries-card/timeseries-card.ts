@@ -178,7 +178,7 @@ export class TimeseriesCard extends BasePrometheusCard<TimeseriesCardConfig> {
           s.query && s.query.trim() ? this._client.rangeQuery(s.query, start, end, step) : Promise.resolve(null)
         )
       );
-      this._data = buildChartData(responses, queries, this._config.palette, this._config.legend_format);
+      this._data = buildChartData(responses, queries, this._config.palette);
       this._error = undefined;
     } catch (e: any) {
       this._error = this._formatError(e);
@@ -232,8 +232,15 @@ export class TimeseriesCard extends BasePrometheusCard<TimeseriesCardConfig> {
     `;
   }
 
+  /** Current (hovered or last) value column, controlled by `show_current` (default on). */
+  private _showCurrent(): boolean {
+    return this._config.show_current !== false;
+  }
+
   private _renderLegendTable(stats: LegendStat[]) {
-    const cols = stats.length ? stats : (['last'] as LegendStat[]);
+    // `last` in the stats list is the static last value; the "current" column follows the cursor
+    const cols = stats;
+    const showCurrent = this._showCurrent();
     return html`
       <div class="legend-table-wrap">
         <table class="legend-table">
@@ -241,6 +248,7 @@ export class TimeseriesCard extends BasePrometheusCard<TimeseriesCardConfig> {
             <tr>
               <th></th>
               ${cols.map((st) => html`<th>${localize(`legend_value_${st}`, this._hass)}</th>`)}
+              ${showCurrent ? html`<th>${localize('current', this._hass)}</th>` : nothing}
             </tr>
           </thead>
           <tbody>
@@ -252,7 +260,8 @@ export class TimeseriesCard extends BasePrometheusCard<TimeseriesCardConfig> {
                       <span class="legend-color" style="background:${s.color}"></span><span>${s.label}</span>
                     </div>
                   </td>
-                  ${cols.map((st) => html`<td>${this._fmt(st === 'last' ? this._current(s) : s.stats[st])}</td>`)}
+                  ${cols.map((st) => html`<td>${this._fmt(s.stats[st])}</td>`)}
+                  ${showCurrent ? html`<td>${this._fmt(this._current(s))}</td>` : nothing}
                 </tr>
               `
             )}
@@ -276,14 +285,13 @@ export class TimeseriesCard extends BasePrometheusCard<TimeseriesCardConfig> {
             >
               <div class="legend-color" style="background-color: ${s.color}"></div>
               <span class="legend-name">${s.label}</span>
-              ${stats.length
-                ? stats.map(
-                    (st) => html`<span class="legend-value"
-                      >${localize(`legend_value_${st}`, this._hass)}:
-                      ${this._fmt(st === 'last' ? this._current(s) : s.stats[st])}</span
-                    >`
-                  )
-                : html`<span class="legend-value">${this._fmt(this._current(s))}</span>`}
+              ${stats.map(
+                (st) => html`<span class="legend-value"
+                  ><span class="legend-stat">${localize(`legend_value_${st}`, this._hass)}:</span>
+                  ${this._fmt(s.stats[st])}</span
+                >`
+              )}
+              ${this._showCurrent() ? html`<span class="legend-value">${this._fmt(this._current(s))}</span>` : nothing}
             </div>
           `
         )}

@@ -9,7 +9,7 @@ import {
   LEGEND_FORMAT_SCHEMA,
   paletteSchema,
   QUERY_SCHEMA,
-  REFRESH_SCHEMA,
+  advancedSection,
   UNIT_SCHEMA
 } from '../../shared/editor-utils';
 import { localize } from '../../localize';
@@ -25,9 +25,16 @@ export class StatCardEditor extends BasePrometheusEditor<StatCardConfig> {
       line_width: 2,
       sparkline_fill: true,
       reduce: 'none',
+      layout: 'default',
+      tile_style: 'gradient',
+      tile_height: 110,
       palette: 'classic',
       color_mode: 'thresholds'
     };
+  }
+
+  private _options(prefix: string, values: string[]) {
+    return values.map((value) => ({ value, label: localize(`${prefix}${value}`, this.hass) }));
   }
 
   protected _sections(): EditorSection[] {
@@ -38,10 +45,8 @@ export class StatCardEditor extends BasePrometheusEditor<StatCardConfig> {
           { name: 'sparkline_fill', selector: { boolean: {} } }
         ]
       : [];
-    const reduceOptions = ['none', 'sum', 'avg', 'min', 'max'].map((value) => ({
-      value,
-      label: localize(`reduce_${value}`, this.hass)
-    }));
+    const reduceOptions = this._options('reduce_', ['none', 'sum', 'avg', 'min', 'max']);
+    const tiles = this._config?.layout === 'tiles';
 
     return [
       {
@@ -65,8 +70,22 @@ export class StatCardEditor extends BasePrometheusEditor<StatCardConfig> {
             name: '',
             type: 'grid',
             schema: [
+              { name: 'layout', selector: { select: { mode: 'dropdown', options: this._options('layout_', ['default', 'tiles']) } } },
+              ...(tiles
+                ? [
+                    { name: 'tile_style', selector: { select: { mode: 'dropdown', options: this._options('tile_style_', ['gradient', 'solid']) } } },
+                    { name: 'tile_height', selector: { number: { min: 50, max: 400, mode: 'box', unit_of_measurement: 'px' } } },
+                    { name: 'tile_min_width', selector: { number: { min: 60, max: 600, mode: 'box', unit_of_measurement: 'px' } } }
+                  ]
+                : [])
+            ]
+          },
+          {
+            name: '',
+            type: 'grid',
+            schema: [
               { name: 'name', selector: { text: {} } },
-              { name: 'icon', selector: { icon: {} } },
+              ...(tiles ? [] : [{ name: 'icon', selector: { icon: {} } }]),
               UNIT_SCHEMA,
               DECIMALS_SCHEMA
             ]
@@ -82,7 +101,7 @@ export class StatCardEditor extends BasePrometheusEditor<StatCardConfig> {
         title: 'section_colors',
         schema: [{ name: '', type: 'grid', schema: [colorModeSchema(this.hass), paletteSchema(this.hass)] }]
       },
-      { title: 'section_advanced', schema: [REFRESH_SCHEMA] }
+      advancedSection()
     ];
   }
 

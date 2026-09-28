@@ -113,6 +113,48 @@ export class StatCard extends BasePrometheusCard<StatCardConfig> {
     </div>`;
   }
 
+  /** Grafana-like tile background: gradient from a lighter to a darker shade of the colour. */
+  private _tileBackground(color: string): string {
+    if (this._config.tile_style === 'solid') return color;
+    return `linear-gradient(120deg, color-mix(in srgb, ${color} 70%, white) 0%, ${color} 45%, color-mix(in srgb, ${color} 75%, black) 100%)`;
+  }
+
+  private _renderTiles(items: StatItem[]) {
+    const c = this._config;
+    const list = items.length ? items : [{ label: c.name || '', value: null, history: [] }];
+    const many = list.length > 1;
+    const style = [
+      `--tile-min: ${c.tile_min_width || (many ? 140 : 200)}px`,
+      `--tile-height: ${c.tile_height || 110}px`,
+      `--tile-font: ${many ? 28 : 40}px`
+    ].join(';');
+    return html`
+      <ha-card>
+        ${c.name && many ? html`<div class="card-title">${c.name}</div>` : nothing}
+        <div class="tiles" style=${style}>
+          ${list.map((item, i) => {
+            const color = this._color(item, i, list.length);
+            const label = many ? item.label : c.name || item.label;
+            return html`
+              <div class="tile" style="--tile-bg: ${this._tileBackground(color)}">
+                ${label ? html`<div class="tile-label" title=${label}>${label}</div>` : nothing}
+                <div class="tile-value">${this._renderValue(item.value, '')}</div>
+                ${c.sparkline && item.history.length > 1
+                  ? html`<prometheus-sparkline
+                      .series=${[{ values: item.history, color: 'rgba(255,255,255,0.85)' }]}
+                      .fill=${c.sparkline_fill !== false}
+                      .lineWidth=${c.line_width ?? 2}
+                      .height=${Math.round((c.tile_height || 110) * 0.4)}
+                    ></prometheus-sparkline>`
+                  : nothing}
+              </div>
+            `;
+          })}
+        </div>
+      </ha-card>
+    `;
+  }
+
   render() {
     const config = this._config;
     if (!this._hasQuery()) return this.renderPlaceholder();
@@ -120,6 +162,7 @@ export class StatCard extends BasePrometheusCard<StatCardConfig> {
     if (!this._loaded) return this.renderLoading();
 
     const items = this._displayItems();
+    if (config.layout === 'tiles') return this._renderTiles(items);
     const single = items.length <= 1;
     const main = items[0] || { label: '', value: null, history: [] };
     const mainColor = this._color(main, 0, items.length);
@@ -153,6 +196,7 @@ export class StatCard extends BasePrometheusCard<StatCardConfig> {
   }
 
   public getCardSize(): number {
+    if (this._config?.layout === 'tiles') return 3;
     return 2 + Math.min(4, Math.max(0, this._displayItems().length - 1));
   }
 }

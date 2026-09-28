@@ -84,4 +84,14 @@ export interface BaseCardConfig {
   decimals?: number;          // empty = auto
   legend_format?: string;     // `{{label}}` template for series labels
   palette?: PaletteOption;    // colour scheme for multiple series
+  transparent?: boolean;      // no card background / shadow
+}
+
+/** Value mapping (state timeline, stat): exact value or numeric range -> text + colour */
+export interface ValueMapping {
+  value?: string;
+  from?: number;
+  to?: number;
+  text?: string;
+  color?: string;
 }

@@ -1,6 +1,7 @@
 import type uPlot from 'uplot';
 import { PrometheusResponse, SeriesConfig, PaletteOption } from '../../types';
 import { itemColor, MAX_SERIES, parseRange } from '../../utils/series';
+import { shortLabel } from '../../utils/format';
 
 export interface ChartSeries {
   key: string;
@@ -40,8 +41,7 @@ function stats(values: (number | null)[]): ChartSeries['stats'] {
 export function buildChartData(
   responses: (PrometheusResponse | null)[],
   queries: SeriesConfig[],
-  palette?: PaletteOption,
-  legendFormat?: string
+  palette?: PaletteOption
 ): ChartData {
   type Raw = { key: string; label: string; explicit?: string; points: Map<number, number | null> };
   const raw: Raw[] = [];
@@ -49,13 +49,19 @@ export function buildChartData(
 
   responses.forEach((res, qi) => {
     const q = queries[qi];
+    // Legend label comes from the query "Name" field only:
+    // `{{label}}` placeholders are expanded, plain text is used as is (+ labels if many series)
     const name = q.name?.trim();
-    const template = name && name.includes('{{') ? name : legendFormat;
-    const plainName = name && !name.includes('{{') ? name : undefined;
-    const parsed = parseRange(res, template, plainName);
+    const template = name && name.includes('{{') ? name : undefined;
+    const plainName = name && !template ? name : undefined;
+    const parsed = parseRange(res, template);
     parsed.forEach((s, si) => {
-      // without any name and a single query, keep the Grafana default label
-      const label = !template && !plainName && queries.length > 1 && !s.label ? `Series ${qi + 1}` : s.label;
+      let label = s.label;
+      if (plainName) {
+        // exactly the name for a single series; name + distinguishing labels if the query returns many
+        label = parsed.length > 1 ? `${plainName} ${shortLabel(s.metric)}` : plainName;
+      }
+      label = label || `Series ${qi + 1}`;
       const points = new Map<number, number | null>();
       for (const [t, v] of s.points) {
         points.set(t, v);

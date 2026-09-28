@@ -97,6 +97,19 @@ export const REFRESH_SCHEMA: HaFormSchema = {
   selector: { number: { min: 5, max: 86400, step: 1, mode: 'box', unit_of_measurement: 's' } }
 };
 
+export const TRANSPARENT_SCHEMA: HaFormSchema = {
+  name: 'transparent',
+  selector: { boolean: {} }
+};
+
+/** Standard "Advanced" section: refresh interval + transparent background (+ extra fields). */
+export function advancedSection(...extra: HaFormSchema[]): { title: string; schema: HaFormSchema[] } {
+  return {
+    title: 'section_advanced',
+    schema: [{ name: '', type: 'grid', schema: [REFRESH_SCHEMA, ...extra, TRANSPARENT_SCHEMA] }]
+  };
+}
+
 export const DECIMALS_SCHEMA: HaFormSchema = {
   name: 'decimals',
   selector: { number: { min: 0, max: 6, step: 1, mode: 'box' } }

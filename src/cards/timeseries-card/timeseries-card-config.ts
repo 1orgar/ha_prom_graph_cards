@@ -11,6 +11,7 @@ export interface TimeseriesCardConfig extends BaseCardConfig {
   line_width?: number;      // default 2
   stacked?: boolean;        // stack series
   show_legend?: boolean;    // default true
+  show_current?: boolean;   // current / hovered value in the legend, default true
   legend_mode?: 'list' | 'table';
   legend_values?: ('last' | 'min' | 'max' | 'mean')[];
   height?: number;          // chart height in px, default 200

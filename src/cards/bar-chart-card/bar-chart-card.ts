@@ -32,7 +32,7 @@ export class BarChartCard extends BasePrometheusCard<BarChartCardConfig> {
       type: 'custom:prometheus-bar-card',
       name: 'Scrape duration',
       query: 'scrape_duration_seconds',
-      group_by: 'job',
+      legend_format: '{{job}}',
       unit: 's',
       decimals: 3,
       orientation: 'horizontal'
@@ -71,7 +71,7 @@ export class BarChartCard extends BasePrometheusCard<BarChartCardConfig> {
         const series = parseInstant(res, template);
         for (const s of series) {
           if (s.value === null) continue;
-          let label = shortLabel(s.metric, template, c.group_by);
+          let label = shortLabel(s.metric, template);
           // plain-text name: prefix labels when the query returns many series
           if (q.name && !template) label = series.length > 1 ? `${q.name} ${label}` : q.name;
           data.push({ label, value: s.value, color: '', explicitColor: series.length === 1 ? q.color : undefined });

@@ -78,8 +78,6 @@ export class GaugeCard extends BasePrometheusCard<GaugeCardConfig> {
     const fraction = max > min ? (clamped - min) / (max - min) : 0;
     const color = this._color(item.value, index, total);
     const f = formatParts(item.value, c.unit, c.decimals);
-    const minText = formatParts(min, c.unit, 0);
-    const maxText = formatParts(max, c.unit, 0);
     const showLabel = total > 1 && c.show_labels !== false;
 
     return html`
@@ -95,10 +93,6 @@ export class GaugeCard extends BasePrometheusCard<GaugeCardConfig> {
           <div class="value-container">
             <span class="value">${f.prefix}${f.text}</span>
             ${f.suffix.trim() ? html`<span class="unit">${f.suffix.trim()}</span>` : nothing}
-          </div>
-          <div class="labels">
-            <span>${minText.prefix}${minText.text}</span>
-            <span>${maxText.prefix}${maxText.text}${maxText.suffix}</span>
           </div>
         </div>
         ${showLabel ? html`<div class="series-label" title=${item.label}>${item.label}</div>` : nothing}

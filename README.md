@@ -17,7 +17,8 @@ Grafana-style dashboard cards for Home Assistant, powered by PromQL.
 
 ## ✨ Features
 
-- 📊 **4 cards** — Stat, Gauge, Time Series (uPlot), Bar Chart
+- 📊 **6 cards** — Stat (value or Grafana-like gradient tiles), Gauge, Time Series (uPlot), Bar Chart, State Timeline, Pie / Donut
+- 🪟 **Transparent background** option on every card
 - 🧩 **Listed in the card picker** — *Add card → Custom / Community*
 - 🛠️ **Fully visual editor** — every option, thresholds and series are editable in the UI, no YAML needed
 - 🔢 **Multi-series everywhere** — a query returning many series draws many lines / stat rows / gauges / bars
@@ -52,6 +53,8 @@ Everything is configured in the visual editor.
 | Prometheus Gauge | `custom:prometheus-gauge-card` |
 | Prometheus Time Series | `custom:prometheus-timeseries-card` |
 | Prometheus Bar Chart | `custom:prometheus-bar-card` |
+| Prometheus State Timeline | `custom:prometheus-state-timeline-card` |
+| Prometheus Pie Chart | `custom:prometheus-pie-card` |
 
 <details>
 <summary>YAML reference (optional)</summary>
@@ -109,10 +112,57 @@ series:
 type: custom:prometheus-bar-card
 query: 100 - node_filesystem_avail_bytes / node_filesystem_size_bytes * 100
 name: Disk usage
-group_by: mountpoint
+legend_format: '{{mountpoint}}'
 unit: percent
 max: 100
 ```
+
+
+<details>
+<summary>More examples: stat tiles, state timeline, pie</summary>
+
+```yaml
+# Grafana-like coloured tiles, one per series
+type: custom:prometheus-stat-card
+name: CPU usage
+query: 100 - avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100
+legend_format: '{{instance}}'
+layout: tiles
+tile_style: gradient
+unit: percent
+sparkline: true
+thresholds:
+  - { value: 0, color: '#73BF69' }
+  - { value: 70, color: '#FF9830' }
+  - { value: 90, color: '#F2495C' }
+```
+
+```yaml
+type: custom:prometheus-state-timeline-card
+title: Targets
+time_range: 24h
+series:
+  - query: up
+    name: '{{job}}'
+mappings:
+  - { value: '1', text: UP, color: '#73BF69' }
+  - { value: '0', text: DOWN, color: '#F2495C' }
+```
+
+```yaml
+type: custom:prometheus-pie-card
+title: Disk usage by mount
+series:
+  - query: node_filesystem_size_bytes - node_filesystem_avail_bytes
+    name: '{{mountpoint}}'
+unit: bytes
+pie_type: donut
+legend_values: [value, percent]
+limit: 5
+transparent: true
+```
+
+</details>
 
 </details>
 

@@ -14,4 +14,9 @@ export interface StatCardConfig extends BaseCardConfig {
   reduce?: StatReduce;
   color_mode?: 'thresholds' | 'series';
   thresholds?: ThresholdConfig[];
+  /** `default` = icon + value (+ rows), `tiles` = Grafana-like coloured tiles, one per series */
+  layout?: 'default' | 'tiles';
+  tile_style?: 'gradient' | 'solid';  // tile background, default gradient
+  tile_min_width?: number;            // px, default 140
+  tile_height?: number;               // px, default 110
 }

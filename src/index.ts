@@ -3,6 +3,8 @@ import './cards/stat-card/stat-card';
 import './cards/gauge-card/gauge-card';
 import './cards/timeseries-card/timeseries-card';
 import './cards/bar-chart-card/bar-chart-card';
+import './cards/state-timeline-card/state-timeline-card';
+import './cards/pie-chart-card/pie-chart-card';
 import { localize } from './localize';
 
 declare const __VERSION__: string;
@@ -14,7 +16,9 @@ const CARDS = [
   { type: 'prometheus-stat-card', key: 'stat' },
   { type: 'prometheus-gauge-card', key: 'gauge' },
   { type: 'prometheus-timeseries-card', key: 'timeseries' },
-  { type: 'prometheus-bar-card', key: 'bar' }
+  { type: 'prometheus-bar-card', key: 'bar' },
+  { type: 'prometheus-state-timeline-card', key: 'timeline' },
+  { type: 'prometheus-pie-card', key: 'pie' }
 ];
 
 const w = window as any;

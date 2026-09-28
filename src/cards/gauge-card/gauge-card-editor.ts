@@ -9,7 +9,7 @@ import {
   LEGEND_FORMAT_SCHEMA,
   paletteSchema,
   QUERY_SCHEMA,
-  REFRESH_SCHEMA,
+  advancedSection,
   UNIT_SCHEMA
 } from '../../shared/editor-utils';
 
@@ -61,7 +61,7 @@ export class GaugeCardEditor extends BasePrometheusEditor<GaugeCardConfig> {
           }
         ]
       },
-      { title: 'section_advanced', schema: [REFRESH_SCHEMA] }
+      advancedSection()
     ];
   }
 

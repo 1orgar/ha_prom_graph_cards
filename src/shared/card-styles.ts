@@ -12,6 +12,15 @@ export const cardStyles: CSSResultGroup = css`
     box-sizing: border-box;
   }
 
+  /* "Transparent background" option: no plate, no shadow, no border */
+  :host([transparent]) ha-card {
+    background: none;
+    box-shadow: none;
+    border: none;
+    --ha-card-border-width: 0;
+    backdrop-filter: none;
+  }
+
   .card-header {
     font-weight: 500;
     font-size: 14px;

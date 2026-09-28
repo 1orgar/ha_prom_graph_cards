@@ -25,6 +25,7 @@ export abstract class BasePrometheusCard<C extends BaseCardConfig = BaseCardConf
     }
     this._config = config;
     this._error = undefined;
+    this.toggleAttribute('transparent', Boolean(config.transparent));
     this._restart();
   }
 

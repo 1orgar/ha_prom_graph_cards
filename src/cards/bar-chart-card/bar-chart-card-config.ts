@@ -4,7 +4,6 @@ export interface BarChartCardConfig extends BaseCardConfig {
   type: 'custom:prometheus-bar-card';
   /** Extra queries; each may return several series. `query` is kept for v0.2 configs */
   series?: { query: string; name?: string; color?: string }[];
-  group_by?: string;        // label to use as bar name (legend_format has priority)
   orientation?: 'horizontal' | 'vertical';  // default 'horizontal'
   max?: number;             // max value for bar scale
   thresholds?: ThresholdConfig[];

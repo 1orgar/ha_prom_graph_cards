@@ -60,6 +60,10 @@ export const timeseriesStyles = css`
     color: var(--primary-text-color);
     white-space: nowrap;
   }
+  .legend-stat {
+    font-weight: 400;
+    color: var(--secondary-text-color);
+  }
   .legend-table-wrap {
     padding: 4px 16px 12px;
     max-height: var(--legend-max-height, 200px);
