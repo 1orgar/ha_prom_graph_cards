@@ -35,9 +35,10 @@ export class TimeseriesCard extends BasePrometheusCard<TimeseriesCardConfig> {
   public static getStubConfig(): Partial<TimeseriesCardConfig> {
     return {
       type: 'custom:prometheus-timeseries-card',
-      title: 'Prometheus',
+      title: 'Scrape duration',
       time_range: '1h',
-      series: [{ query: 'up', name: '{{job}} {{instance}}' }]
+      unit: 's',
+      series: [{ query: 'scrape_duration_seconds', name: '{{job}}' }]
     };
   }
 

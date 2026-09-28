@@ -1,6 +1,26 @@
 import { css } from 'lit';
 
 export const pieStyles = css`
+  :host {
+    display: block;
+    container-type: inline-size;
+  }
+  /* Narrow card (card picker preview, 3-4 sections columns): legend goes below the chart */
+  @container (max-width: 340px) {
+    .body {
+      flex-direction: column;
+    }
+    .body .legend {
+      flex-direction: row;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 4px 14px;
+      max-height: none;
+    }
+    .chart {
+      width: min(var(--pie-size, 180px), 70cqw);
+    }
+  }
   ha-card {
     padding: 16px;
     gap: 12px;

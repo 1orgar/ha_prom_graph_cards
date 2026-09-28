@@ -29,9 +29,9 @@ export class StatCard extends BasePrometheusCard<StatCardConfig> {
   static getStubConfig(): Partial<StatCardConfig> {
     return {
       type: 'custom:prometheus-stat-card',
-      name: 'Prometheus',
-      query: 'up',
-      icon: 'mdi:chart-line',
+      name: 'Targets up',
+      query: 'sum(up)',
+      icon: 'mdi:server-network',
       decimals: 0,
       sparkline: true
     };

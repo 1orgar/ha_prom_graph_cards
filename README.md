@@ -1,7 +1,7 @@
 # Prometheus Graph Cards for Home Assistant
 
 <p align="center">
-  <img src="images/icon.png" alt="Prometheus Graph Cards" width="150" height="150" style="border-radius: 20px;">
+  <img src="https://raw.githubusercontent.com/1orgar/ha_prom_graph_cards/main/images/icon.png" alt="Prometheus Graph Cards" width="150" height="150">
 </p>
 
 <p align="center">
@@ -15,6 +15,19 @@ Grafana-style dashboard cards for Home Assistant, powered by PromQL.
 > **Requires the backend integration** [Prometheus Dashboard (`ha_prom_graph`)](https://github.com/1orgar/ha_prom_graph).
 > The cards never talk to Prometheus directly — all queries go through the HA websocket API.
 
+![Grid card](https://raw.githubusercontent.com/1orgar/ha_prom_graph_cards/main/images/grid.png)
+
+## 🖼️ Screenshots
+
+| | |
+|:---:|:---:|
+| **Stat** ![Stat](https://raw.githubusercontent.com/1orgar/ha_prom_graph_cards/main/images/stat.png) | **Stat — tiles** ![Stat tiles](https://raw.githubusercontent.com/1orgar/ha_prom_graph_cards/main/images/stat-tiles.png) |
+| **Gauge** ![Gauge](https://raw.githubusercontent.com/1orgar/ha_prom_graph_cards/main/images/gauge.png) | **Bar Gauge** ![Bar gauge](https://raw.githubusercontent.com/1orgar/ha_prom_graph_cards/main/images/bar-gauge.png) |
+| **Time Series** ![Time series](https://raw.githubusercontent.com/1orgar/ha_prom_graph_cards/main/images/timeseries.png) | **State Timeline** ![State timeline](https://raw.githubusercontent.com/1orgar/ha_prom_graph_cards/main/images/state-timeline.png) |
+| **Bar Chart** ![Bar chart](https://raw.githubusercontent.com/1orgar/ha_prom_graph_cards/main/images/bar.png) | **Pie / Donut** ![Pie](https://raw.githubusercontent.com/1orgar/ha_prom_graph_cards/main/images/pie.png) |
+| **Table** ![Table](https://raw.githubusercontent.com/1orgar/ha_prom_graph_cards/main/images/table.png) | **Alerts** ![Alerts](https://raw.githubusercontent.com/1orgar/ha_prom_graph_cards/main/images/alerts.png) |
+| **Heatmap** ![Heatmap](https://raw.githubusercontent.com/1orgar/ha_prom_graph_cards/main/images/heatmap.png) | **Card picker** (built-in demo data) ![Card picker](https://raw.githubusercontent.com/1orgar/ha_prom_graph_cards/main/images/card-picker.png) |
+
 ## ✨ Features
 
 - 📊 **11 cards** — Stat (value or Grafana-like gradient tiles), Gauge, Bar Gauge, Time Series (uPlot), Bar Chart,
@@ -24,7 +37,7 @@ Grafana-style dashboard cards for Home Assistant, powered by PromQL.
 - 📐 **Sections view** support (`getGridOptions`), polling pauses on hidden tabs
 - ♻️ Identical queries of all cards / tabs are merged and cached by the backend
 - 🪟 **Transparent background** option on every card
-- 🧩 **Listed in the card picker** — *Add card → Custom / Community*
+- 🧩 **Listed in the card picker** — *Add card → Custom / Community*, with live previews rendered from built-in demo data
 - 🛠️ **Fully visual editor** — every option, thresholds and series are editable in the UI, no YAML needed
 - 🔢 **Multi-series everywhere** — a query returning many series draws many lines / stat rows / gauges / bars
 - 🎨 **Grafana palettes** — classic palette + by-series schemes, Grafana-like legend (`{{label}}` format, table with min/max/mean, click to isolate)
@@ -248,8 +261,20 @@ npm run build   # production build -> dist/ha_prom_graph_cards.js
 
 `dist/ha_prom_graph_cards.js` is committed (HACS downloads it). Rebuild before committing.
 
-To release: bump `version` in `package.json`, build, commit, then create a GitHub release `vX.Y.Z` —
-the workflow attaches the bundle to the release.
+**Releases are automatic:** bump `version` in `package.json`, rebuild, commit and push to `main`.
+After lint / tests / build pass, CI creates the tag `vX.Y.Z` and a GitHub release with the bundle
+(versions like `1.0.0-beta.1` become pre-releases). If the tag already exists nothing happens.
+
+**Screenshots** (`images/*.png`) are generated from `demo/` with the built-in demo data:
+
+```bash
+npm run build
+npm i --no-save playwright-core
+node demo/screenshots.mjs   # uses the installed Google Chrome (CHROME_PATH=... to override)
+```
+
+Card previews in *Add card* use the same demo data (`src/demo/demo-data.ts`), so they look good
+on any Prometheus server; real queries run once the card is added.
 
 ## 📄 License
 

@@ -34,7 +34,6 @@ export class BarChartCard extends BasePrometheusCard<BarChartCardConfig> {
       query: 'scrape_duration_seconds',
       legend_format: '{{job}}',
       unit: 's',
-      decimals: 3,
       orientation: 'horizontal'
     };
   }

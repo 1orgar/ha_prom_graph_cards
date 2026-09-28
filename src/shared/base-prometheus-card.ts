@@ -4,6 +4,7 @@ import { HomeAssistant, BaseCardConfig } from '../types';
 import { PrometheusClient } from '../prometheus-client';
 import { cardStyles } from './card-styles';
 import { localize } from '../localize';
+import { isDemoContext } from '../demo/demo-data';
 
 const DEFAULT_REFRESH_INTERVAL = 30;
 
@@ -16,6 +17,7 @@ export abstract class BasePrometheusCard<C extends BaseCardConfig = BaseCardConf
   private _interval?: number;
   private _cachedClient?: PrometheusClient;
   private _connected = false;
+  private _demo?: boolean;
 
   static styles = cardStyles;
 
@@ -76,10 +78,22 @@ export abstract class BasePrometheusCard<C extends BaseCardConfig = BaseCardConf
 
   protected get _client(): PrometheusClient {
     const entryId = this._config.entry_id || undefined;
-    if (!this._cachedClient || this._cachedClient.entryId !== entryId) {
-      this._cachedClient = new PrometheusClient(this._hass!, entryId);
+    const demo = this._isDemo();
+    if (!this._cachedClient || this._cachedClient.entryId !== entryId || this._cachedClient.demo !== demo) {
+      this._cachedClient = new PrometheusClient(this._hass!, entryId, demo);
     }
     return this._cachedClient;
+  }
+
+  /**
+   * Previews in the dashboard "Add card" picker are rendered with built-in demo data,
+   * so every card shows a meaningful picture regardless of the metrics on the server.
+   */
+  private _isDemo(): boolean {
+    if (this._demo === undefined && this._connected) {
+      this._demo = isDemoContext(this);
+    }
+    return Boolean(this._demo);
   }
 
   protected abstract _fetchData(): Promise<void>;
