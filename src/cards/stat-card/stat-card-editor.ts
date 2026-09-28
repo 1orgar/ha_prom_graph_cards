@@ -17,6 +17,10 @@ import { HaFormSchema } from '../../types';
 
 @customElement('prometheus-stat-card-editor')
 export class StatCardEditor extends BasePrometheusEditor<StatCardConfig> {
+  protected _queryMode(): 'instant' | 'range' {
+    return this._config?.sparkline ? 'range' : 'instant';
+  }
+
   protected _defaults(): Partial<StatCardConfig> {
     return {
       refresh_interval: 30,

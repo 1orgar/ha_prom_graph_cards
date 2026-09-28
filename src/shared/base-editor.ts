@@ -4,6 +4,7 @@ import { BaseCardConfig, HaFormSchema, HomeAssistant } from '../types';
 import { localize } from '../localize';
 import { cleanConfig, editorStyles, fireConfigChanged, loadHaComponents } from './editor-utils';
 import './list-editor';
+import './query-editor';
 
 const THRESHOLD_SCHEMA: HaFormSchema[] = [
   {
@@ -97,12 +98,14 @@ export abstract class BasePrometheusEditor<C extends BaseCardConfig> extends Lit
     if (!this._config) return;
     const value = ev.detail.value as Partial<C>;
     const next = cleanConfig({ ...this._config, ...value } as Record<string, any>);
-    // ha-form omits cleared fields from `value`, drop them explicitly
-    for (const section of this._sections()) {
-      for (const name of this._fieldNames(section.schema)) {
-        if (!(name in value) || value[name as keyof C] === '' || value[name as keyof C] === undefined) {
-          delete next[name];
-        }
+    // ha-form omits cleared fields from `value`, drop them explicitly.
+    // Only fields of the ha-form that fired the event are considered (forms are split
+    // around the query editor, each form only knows its own fields).
+    const form = ev.target as { schema?: HaFormSchema[] } | null;
+    const names = form?.schema ? this._fieldNames(form.schema) : [];
+    for (const name of names) {
+      if (!(name in value) || value[name as keyof C] === '' || value[name as keyof C] === undefined) {
+        delete next[name];
       }
     }
     // Defaults are only displayed; don't persist them unless the user changed them
@@ -129,6 +132,50 @@ export abstract class BasePrometheusEditor<C extends BaseCardConfig> extends Lit
     return names;
   }
 
+  /** `query` fields are rendered with the PromQL editor (autocomplete + test), not ha-form. */
+  private _renderSchema(schema: HaFormSchema[], data: Record<string, unknown>): TemplateResult {
+    const parts: TemplateResult[] = [];
+    let chunk: HaFormSchema[] = [];
+    const flush = () => {
+      if (!chunk.length) return;
+      const s = chunk;
+      chunk = [];
+      parts.push(html`<ha-form
+        .hass=${this.hass}
+        .data=${data}
+        .schema=${s}
+        .computeLabel=${this._computeLabel}
+        .computeHelper=${this._computeHelper}
+        @value-changed=${this._formChanged}
+      ></ha-form>`);
+    };
+    for (const item of schema) {
+      if (item.name === 'query' && !item.schema) {
+        flush();
+        parts.push(html`<prometheus-query-editor
+          .hass=${this.hass}
+          .label=${localize('query', this.hass)}
+          .value=${(this._config as any)?.query || ''}
+          .entryId=${(this._config as any)?.entry_id || undefined}
+          .mode=${this._queryMode()}
+          @value-changed=${(ev: CustomEvent) => {
+            ev.stopPropagation();
+            this._updateConfig({ query: ev.detail.value } as unknown as Partial<C>);
+          }}
+        ></prometheus-query-editor>`);
+      } else {
+        chunk.push(item);
+      }
+    }
+    flush();
+    return html`${parts}`;
+  }
+
+  /** Cards that run range queries test queries as range. */
+  protected _queryMode(): 'instant' | 'range' {
+    return 'instant';
+  }
+
   protected render(): TemplateResult {
     if (!this.hass || !this._config || !this._ready) {
       return html``;
@@ -139,14 +186,7 @@ export abstract class BasePrometheusEditor<C extends BaseCardConfig> extends Lit
         ${this._sections().map(
           (section) => html`
             ${section.title ? html`<div class="section-title">${localize(section.title, this.hass)}</div>` : nothing}
-            <ha-form
-              .hass=${this.hass}
-              .data=${data}
-              .schema=${section.schema}
-              .computeLabel=${this._computeLabel}
-              .computeHelper=${this._computeHelper}
-              @value-changed=${this._formChanged}
-            ></ha-form>
+            ${this._renderSchema(section.schema, data)}
           `
         )}
         ${this._renderExtra()}

@@ -1,5 +1,13 @@
 import { HomeAssistant, PrometheusResponse, PrometheusEntry } from './types';
 
+export interface PrometheusAlert {
+  labels: Record<string, string>;
+  annotations?: Record<string, string>;
+  state: 'firing' | 'pending' | 'inactive';
+  activeAt?: string;
+  value?: string;
+}
+
 export interface MetadataEntry {
   type: string;
   help: string;
@@ -58,6 +66,11 @@ export class PrometheusClient {
       this._msg('series', { match: matchers })
     );
     return res.data;
+  }
+
+  async getAlerts(): Promise<PrometheusAlert[]> {
+    const res = await this.hass.callWS<{ alerts: PrometheusAlert[] }>(this._msg('alerts'));
+    return res.alerts || [];
   }
 
   static async getEntries(hass: HomeAssistant): Promise<PrometheusEntry[]> {

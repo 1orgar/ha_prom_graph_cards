@@ -44,13 +44,29 @@ export abstract class BasePrometheusCard<C extends BaseCardConfig = BaseCardConf
   connectedCallback() {
     super.connectedCallback();
     this._connected = true;
+    document.addEventListener('visibilitychange', this._onVisibility);
     this._restart();
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
     this._connected = false;
+    document.removeEventListener('visibilitychange', this._onVisibility);
     this._stopAutoRefresh();
+  }
+
+  /** Pause polling on hidden tabs / screens off; refresh immediately when visible again. */
+  private _onVisibility = () => {
+    if (document.visibilityState === 'hidden') {
+      this._stopAutoRefresh();
+    } else {
+      this._restart();
+    }
+  };
+
+  /** Sizes for the "Sections" dashboard view (12-column grid). Overridden per card. */
+  public getGridOptions(): { columns?: number | 'full'; rows?: number | 'auto'; min_columns?: number; min_rows?: number } {
+    return { columns: 6, rows: 'auto', min_columns: 3 };
   }
 
   /** Whether the config contains enough info to query Prometheus. */
@@ -91,6 +107,9 @@ export abstract class BasePrometheusCard<C extends BaseCardConfig = BaseCardConf
 
   private _restart() {
     if (!this._hass || !this._config || !this._connected) {
+      return;
+    }
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
       return;
     }
     this._startAutoRefresh();

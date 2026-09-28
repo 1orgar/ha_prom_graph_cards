@@ -125,6 +125,8 @@ export class TimeseriesCardEditor extends BasePrometheusEditor<TimeseriesCardCon
         .hass=${this.hass}
         .items=${this._config?.series || []}
         .schema=${SERIES_SCHEMA}
+        .entryId=${this._config?.entry_id}
+        .queryMode=${'range'}
         .itemTitle=${localize('query_n', this.hass)}
         .addLabel=${localize('add_query', this.hass)}
         .newItem=${() => ({ query: '' })}

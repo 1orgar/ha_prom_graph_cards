@@ -5,7 +5,7 @@ import { cardStyles } from '../../shared/card-styles';
 import { StateTimelineCardConfig } from './state-timeline-card-config';
 import { stateTimelineStyles } from './state-timeline-card-styles';
 import { buildTimeline, TimelineRow } from './state-timeline-data';
-import { calculateStep, parseTimeRange } from '../../utils/time';
+import { rangeWindow } from '../../utils/time';
 import { MappedState } from '../../utils/mappings';
 import { localize } from '../../localize';
 import './state-timeline-card-editor';
@@ -46,6 +46,10 @@ export class StateTimelineCard extends BasePrometheusCard<StateTimelineCardConfi
     return Boolean(this._config?.series?.some((s) => s?.query?.trim()));
   }
 
+  public getGridOptions() {
+    return { columns: 12, rows: 'auto' as const, min_columns: 6 };
+  }
+
   public getCardSize(): number {
     return 2 + Math.ceil(this._rows.length / 2);
   }
@@ -54,8 +58,9 @@ export class StateTimelineCard extends BasePrometheusCard<StateTimelineCardConfi
     const c = this._config;
     try {
       this._loading = true;
-      const { start, end } = parseTimeRange(c.time_range || '6h');
-      const step = c.step ? String(c.step) : calculateStep(start, end, 300);
+      const win = rangeWindow(c.time_range || '6h', 300);
+      const { start, end } = win;
+      const step = c.step ? String(c.step) : win.step;
       const queries = c.series.filter((s) => s?.query?.trim());
       const responses = await Promise.all(queries.map((q) => this._client.rangeQuery(q.query, start, end, step)));
       this._rows = buildTimeline(responses, queries, c, parseFloat(step) || 60, end);

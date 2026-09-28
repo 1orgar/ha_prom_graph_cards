@@ -17,7 +17,12 @@ Grafana-style dashboard cards for Home Assistant, powered by PromQL.
 
 ## ✨ Features
 
-- 📊 **6 cards** — Stat (value or Grafana-like gradient tiles), Gauge, Time Series (uPlot), Bar Chart, State Timeline, Pie / Donut
+- 📊 **11 cards** — Stat (value or Grafana-like gradient tiles), Gauge, Bar Gauge, Time Series (uPlot), Bar Chart,
+  State Timeline, Pie / Donut, Table, Heatmap, Alerts list and a **Grid** layout card
+- 🧱 **Grid card** — rows with any number of cards and width ratios (`25,25,50`) on one shared background
+- ⌨️ **PromQL editor** — autocomplete for metrics, functions, labels and label values + **Test query** button
+- 📐 **Sections view** support (`getGridOptions`), polling pauses on hidden tabs
+- ♻️ Identical queries of all cards / tabs are merged and cached by the backend
 - 🪟 **Transparent background** option on every card
 - 🧩 **Listed in the card picker** — *Add card → Custom / Community*
 - 🛠️ **Fully visual editor** — every option, thresholds and series are editable in the UI, no YAML needed
@@ -55,6 +60,14 @@ Everything is configured in the visual editor.
 | Prometheus Bar Chart | `custom:prometheus-bar-card` |
 | Prometheus State Timeline | `custom:prometheus-state-timeline-card` |
 | Prometheus Pie Chart | `custom:prometheus-pie-card` |
+| Prometheus Bar Gauge | `custom:prometheus-bar-gauge-card` |
+| Prometheus Table | `custom:prometheus-table-card` |
+| Prometheus Heatmap | `custom:prometheus-heatmap-card` |
+| Prometheus Alerts | `custom:prometheus-alerts-card` |
+| Prometheus Grid | `custom:prometheus-grid-card` |
+
+In any query field press **Ctrl+Space** for suggestions (they also appear while typing) and
+**Test query** to see the number of returned series, sample labels or the PromQL error.
 
 <details>
 <summary>YAML reference (optional)</summary>
@@ -166,11 +179,70 @@ transparent: true
 
 </details>
 
+<details>
+<summary>Grid, bar gauge, table, heatmap, alerts</summary>
+
+```yaml
+# 3 cards 25/25/50 in the first row, one full-width chart in the second
+type: custom:prometheus-grid-card
+title: Server
+background: card          # card | transparent | custom (+ background_color)
+inner_transparent: true   # child cards drop their own background
+gap: 8
+rows:
+  - widths: 25,25,50
+    cards:
+      - type: custom:prometheus-stat-card
+        name: Load
+        query: node_load1
+      - type: custom:prometheus-stat-card
+        name: Up
+        query: sum(up)
+      - type: custom:prometheus-bar-gauge-card
+        query: 100 - node_filesystem_avail_bytes / node_filesystem_size_bytes * 100
+        legend_format: '{{mountpoint}}'
+        unit: percent
+        max: 100
+  - cards:
+      - type: custom:prometheus-timeseries-card
+        time_range: 6h
+        series:
+          - query: rate(node_cpu_seconds_total{mode!="idle"}[5m])
+            name: '{{mode}}'
+```
+
+```yaml
+type: custom:prometheus-table-card
+query: up
+columns: [job, instance]
+thresholds: [{ value: 0, color: '#F2495C' }, { value: 1, color: '#73BF69' }]
+color_cells: true
+```
+
+```yaml
+type: custom:prometheus-heatmap-card
+query: sum by (le) (rate(prometheus_http_request_duration_seconds_bucket[5m]))
+heatmap_mode: histogram   # or "series"
+color_scheme: spectral
+time_range: 6h
+```
+
+```yaml
+type: custom:prometheus-alerts-card
+states: [firing, pending]
+severities: critical,warning
+show_labels: true
+```
+
+</details>
+
+
 ## 🔧 Development
 
 ```bash
 npm install
 npm run watch   # dev build
+npm test        # unit tests (vitest)
 npm run build   # production build -> dist/ha_prom_graph_cards.js
 ```
 

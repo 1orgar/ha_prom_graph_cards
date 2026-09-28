@@ -96,6 +96,7 @@ export class BarChartCardEditor extends BasePrometheusEditor<BarChartCardConfig>
         .hass=${this.hass}
         .items=${this._config?.series || []}
         .schema=${EXTRA_QUERY_SCHEMA}
+        .entryId=${this._config?.entry_id}
         .itemTitle=${localize('query_n', this.hass)}
         .addLabel=${localize('add_query', this.hass)}
         .newItem=${() => ({ query: '' })}

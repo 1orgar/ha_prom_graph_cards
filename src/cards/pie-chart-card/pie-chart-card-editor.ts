@@ -105,6 +105,7 @@ export class PieChartCardEditor extends BasePrometheusEditor<PieChartCardConfig>
         .hass=${this.hass}
         .items=${this._config?.series || []}
         .schema=${QUERY_ITEM_SCHEMA}
+        .entryId=${this._config?.entry_id}
         .itemTitle=${localize('query_n', this.hass)}
         .addLabel=${localize('add_query', this.hass)}
         .newItem=${() => ({ query: '' })}

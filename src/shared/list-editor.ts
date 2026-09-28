@@ -3,6 +3,7 @@ import { customElement, property } from 'lit/decorators.js';
 import { HaFormSchema, HomeAssistant } from '../types';
 import { localize } from '../localize';
 import { fireEvent } from './editor-utils';
+import './query-editor';
 
 const MDI_DELETE =
   'M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z';
@@ -20,8 +21,20 @@ export class PrometheusListEditor extends LitElement {
   @property({ attribute: false }) public newItem: () => Record<string, unknown> = () => ({});
   @property() public itemTitle = '';
   @property() public addLabel = '';
+  /** server used for query autocomplete / test */
+  @property({ attribute: false }) public entryId?: string;
+  @property() public queryMode: 'instant' | 'range' = 'instant';
 
   private _computeLabel = (schema: HaFormSchema): string => localize(schema.name, this.hass);
+
+  /** Top-level `query` fields are rendered with the PromQL editor. */
+  private get _hasQuery(): boolean {
+    return this.schema.some((s) => s.name === 'query' && !s.schema);
+  }
+
+  private get _formSchema(): HaFormSchema[] {
+    return this.schema.filter((s) => !(s.name === 'query' && !s.schema));
+  }
 
   private _emit(items: Record<string, unknown>[]) {
     fireEvent(this, 'value-changed', { value: items });
@@ -30,12 +43,20 @@ export class PrometheusListEditor extends LitElement {
   private _itemChanged(index: number, ev: CustomEvent) {
     ev.stopPropagation();
     const items = [...this.items];
-    const value = { ...ev.detail.value };
+    // keep fields that are not part of the ha-form (e.g. `query`)
+    const value = { ...items[index], ...ev.detail.value };
+    for (const name of this._fieldNames(this._formSchema)) {
+      if (!(name in ev.detail.value)) delete value[name];
+    }
     for (const key of Object.keys(value)) {
       if (value[key] === '' || value[key] === undefined) delete value[key];
     }
     items[index] = value;
     this._emit(items);
+  }
+
+  private _fieldNames(schema: HaFormSchema[]): string[] {
+    return schema.flatMap((s) => (s.schema ? this._fieldNames(s.schema) : [s.name]));
   }
 
   private _remove(index: number) {
@@ -61,10 +82,25 @@ export class PrometheusListEditor extends LitElement {
                 @click=${() => this._remove(i)}
               ></ha-icon-button>
             </div>
+            ${this._hasQuery
+              ? html`<prometheus-query-editor
+                  .hass=${this.hass}
+                  .label=${localize('query', this.hass)}
+                  .value=${(item.query as string) || ''}
+                  .entryId=${this.entryId}
+                  .mode=${this.queryMode}
+                  @value-changed=${(ev: CustomEvent) => {
+                    ev.stopPropagation();
+                    const items = [...this.items];
+                    items[i] = { ...items[i], query: ev.detail.value };
+                    this._emit(items);
+                  }}
+                ></prometheus-query-editor>`
+              : nothing}
             <ha-form
               .hass=${this.hass}
               .data=${item}
-              .schema=${this.schema}
+              .schema=${this._formSchema}
               .computeLabel=${this._computeLabel}
               @value-changed=${(ev: CustomEvent) => this._itemChanged(i, ev)}
             ></ha-form>

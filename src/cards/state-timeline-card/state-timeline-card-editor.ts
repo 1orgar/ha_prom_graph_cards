@@ -91,6 +91,8 @@ export class StateTimelineCardEditor extends BasePrometheusEditor<StateTimelineC
         .hass=${this.hass}
         .items=${this._config?.series || []}
         .schema=${QUERY_ITEM_SCHEMA}
+        .entryId=${this._config?.entry_id}
+        .queryMode=${'range'}
         .itemTitle=${localize('query_n', this.hass)}
         .addLabel=${localize('add_query', this.hass)}
         .newItem=${() => ({ query: '' })}

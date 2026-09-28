@@ -10,7 +10,7 @@ import { timeseriesStyles } from './timeseries-card-styles';
 import { buildChartData, ChartData, ChartSeries, toAligned } from './timeseries-data';
 import { formatValue } from '../../utils/format';
 import { withAlpha } from '../../utils/color';
-import { parseTimeRange, calculateStep } from '../../utils/time';
+import { rangeWindow } from '../../utils/time';
 import { localize } from '../../localize';
 import './timeseries-card-editor';
 
@@ -53,6 +53,10 @@ export class TimeseriesCard extends BasePrometheusCard<TimeseriesCardConfig> {
 
   protected _hasQuery(): boolean {
     return Boolean(this._config?.series?.some((s) => s && s.query && s.query.trim()));
+  }
+
+  public getGridOptions() {
+    return { columns: 12, rows: 'auto' as const, min_columns: 6 };
   }
 
   public getCardSize(): number {
@@ -171,8 +175,9 @@ export class TimeseriesCard extends BasePrometheusCard<TimeseriesCardConfig> {
     const queries = this._config.series;
     try {
       this._loading = true;
-      const { start, end } = parseTimeRange(this._config.time_range || '1h');
-      const step = this._config.step ? String(this._config.step) : calculateStep(start, end);
+      const win = rangeWindow(this._config.time_range || '1h');
+      const { start, end } = win;
+      const step = this._config.step ? String(this._config.step) : win.step;
       const responses = await Promise.all(
         queries.map((s) =>
           s.query && s.query.trim() ? this._client.rangeQuery(s.query, start, end, step) : Promise.resolve(null)

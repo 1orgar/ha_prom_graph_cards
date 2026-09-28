@@ -122,6 +122,10 @@ export class GaugeCard extends BasePrometheusCard<GaugeCardConfig> {
     `;
   }
 
+  public getGridOptions() {
+    return { columns: this._items.length > 1 ? 12 : 6, rows: 'auto' as const, min_columns: 3 };
+  }
+
   public getCardSize(): number {
     return this._items.length > 2 ? 5 : 3;
   }

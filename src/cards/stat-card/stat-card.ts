@@ -4,7 +4,7 @@ import { BasePrometheusCard } from '../../shared/base-prometheus-card';
 import { cardStyles } from '../../shared/card-styles';
 import { formatParts, shortLabel } from '../../utils/format';
 import { getThresholdColor } from '../../utils/color';
-import { calculateStep } from '../../utils/time';
+import { rangeWindow } from '../../utils/time';
 import { itemColor, lastValue, parseInstant, parseRange, reduceValues } from '../../utils/series';
 import '../../shared/sparkline';
 import './stat-card-editor';
@@ -46,10 +46,8 @@ export class StatCard extends BasePrometheusCard<StatCardConfig> {
     try {
       this._loading = true;
       if (config.sparkline) {
-        const hours = config.sparkline_hours || 24;
-        const end = Math.floor(Date.now() / 1000);
-        const start = end - hours * 3600;
-        const res = await this._client.rangeQuery(config.query!, start, end, calculateStep(start, end, 120));
+        const { start, end, step } = rangeWindow(`${config.sparkline_hours || 24}h`, 120);
+        const res = await this._client.rangeQuery(config.query!, start, end, step);
         this._items = parseRange(res, config.legend_format).map((s) => ({
           label: shortLabel(s.metric, config.legend_format),
           value: lastValue(s.points),
@@ -193,6 +191,11 @@ export class StatCard extends BasePrometheusCard<StatCardConfig> {
           : nothing}
       </ha-card>
     `;
+  }
+
+  public getGridOptions() {
+    const many = this._displayItems().length > 1;
+    return { columns: many || this._config?.layout === 'tiles' ? 6 : 3, rows: 'auto' as const, min_columns: 3 };
   }
 
   public getCardSize(): number {
