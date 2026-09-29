@@ -20,6 +20,7 @@ export class BarChartCardEditor extends BasePrometheusEditor<BarChartCardConfig>
       show_values: true,
       transparent_track: false,
       value_at_end: false,
+      gradient: false,
       refresh_interval: 30,
       sort: 'desc',
       palette: 'classic',
@@ -51,6 +52,7 @@ export class BarChartCardEditor extends BasePrometheusEditor<BarChartCardConfig>
         { name: 'transparent_track', selector: { boolean: {} } },
         ...(c?.transparent_track && c?.show_values !== false ? [{ name: 'value_at_end', selector: { boolean: {} } }] : []),
         colorModeSchema(this.hass),
+        ...(c?.color_mode !== 'series' ? [{ name: 'gradient', selector: { boolean: {} } }] : []),
         paletteSchema(this.hass)
       )
     ];

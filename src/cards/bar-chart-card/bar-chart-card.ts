@@ -4,7 +4,7 @@ import { BasePrometheusCard } from '../../shared/base-prometheus-card';
 import { cardStyles } from '../../shared/card-styles';
 import { BarChartCardConfig } from './bar-chart-card-config';
 import { barChartStyles } from './bar-chart-card-styles';
-import { BarData, barPercent, buildBars } from './bar-data';
+import { BarData, barPercent, buildBars, gradientFill } from './bar-data';
 import { formatValue } from '../../utils/format';
 import { localize } from '../../localize';
 import './bar-chart-card-editor';
@@ -76,6 +76,14 @@ export class BarChartCard extends BasePrometheusCard<BarChartCardConfig> {
     return formatValue(value, this._config.decimals, this._config.unit);
   }
 
+  /** Background of a bar: the value colour, or the threshold gradient (`gradient`). */
+  private _fill(d: BarData, pct: number, vertical: boolean): string {
+    const c = this._config;
+    const byThresholds = c.color_mode !== 'series';
+    const gradient = c.gradient && byThresholds ? gradientFill(c.thresholds, this._calculatedMax || 1, pct, vertical) : null;
+    return `background: ${gradient ?? d.color};`;
+  }
+
   private _renderBars() {
     const c = this._config;
     const max = this._calculatedMax || 1;
@@ -95,7 +103,7 @@ export class BarChartCard extends BasePrometheusCard<BarChartCardConfig> {
                 ${showValues && !atEnd ? html`<div class="bar-col-value">${this._fmt(d.value)}</div>` : nothing}
                 <div class="${trackCls} col-track">
                   ${atEnd ? html`<div class="end-value" style="bottom: ${pct}%">${this._fmt(d.value)}</div>` : nothing}
-                  <div class="bar-fill" style="height: ${pct}%; background-color: ${d.color};"></div>
+                  <div class="bar-fill" style="height: ${pct}%; ${this._fill(d, pct, true)}"></div>
                 </div>
                 <div class="bar-col-label" title="${d.label}">${d.label}</div>
               </div>
@@ -116,7 +124,7 @@ export class BarChartCard extends BasePrometheusCard<BarChartCardConfig> {
               <div class="bar-label" title="${d.label}">${d.label}</div>
               <div class="${trackCls} row-track ${atEnd ? 'with-end' : ''}">
                 <!-- with the value at the end the bar scales to the space left for the value -->
-                <div class="bar-fill" style="width: ${atEnd ? `calc((100% - var(--end-w)) * ${pct / 100})` : `${pct}%`}; background-color: ${d.color};"></div>
+                <div class="bar-fill" style="width: ${atEnd ? `calc((100% - var(--end-w)) * ${pct / 100})` : `${pct}%`}; ${this._fill(d, pct, false)}"></div>
                 ${atEnd ? html`<div class="end-value">${this._fmt(d.value)}</div>` : nothing}
               </div>
               ${showValues && !atEnd ? html`<div class="bar-value">${this._fmt(d.value)}</div>` : nothing}

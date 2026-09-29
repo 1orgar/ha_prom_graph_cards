@@ -85,7 +85,14 @@ export const DEMO_CARDS = [
       unit: 'bytes',
       palette: 'classic',
       transparent_track: true,
-      value_at_end: true
+      value_at_end: true,
+      max: 8e9,
+      gradient: true,
+      thresholds: [
+        { value: 0, color: 'green' },
+        { value: 3e9, color: 'yellow' },
+        { value: 6e9, color: 'red' }
+      ]
     }
   },
   {
@@ -98,7 +105,7 @@ export const DEMO_CARDS = [
       query: 'up',
       legend_format: '{{job}}',
       mappings: [
-        { value: '1', text: 'UP', color: '#73BF69' },
+        { value: '1', text: 'UP', color: '#73BF69', transparent: true },
         { value: '0', text: 'DOWN', color: '#F2495C' }
       ]
     }

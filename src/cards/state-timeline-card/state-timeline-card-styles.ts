@@ -31,12 +31,12 @@ export const stateTimelineStyles = css`
     text-overflow: ellipsis;
     max-width: 160px;
   }
+  /* no track background: transparent states and gaps without data show the card background */
   .row-bar {
     position: relative;
     height: var(--row-height, 26px);
     border-radius: 4px;
     overflow: hidden;
-    background: var(--secondary-background-color, rgba(127, 127, 127, 0.12));
   }
   .segment {
     position: absolute;
@@ -91,10 +91,5 @@ export const stateTimelineStyles = css`
     color: var(--secondary-text-color);
     text-shadow: none;
     box-shadow: none;
-  }
-  .tooltip {
-    font-size: 12px;
-    color: var(--secondary-text-color);
-    min-height: 16px;
   }
 `;

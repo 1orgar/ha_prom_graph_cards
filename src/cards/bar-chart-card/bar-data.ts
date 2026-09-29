@@ -1,6 +1,6 @@
-import { PrometheusResponse } from '../../types';
+import { PrometheusResponse, ThresholdConfig } from '../../types';
 import { shortLabel } from '../../utils/format';
-import { getThresholdColor } from '../../utils/color';
+import { getThresholdColor, GRAFANA_CLASSIC, stepColor } from '../../utils/color';
 import { itemColor, parseInstant } from '../../utils/series';
 import { BarChartCardConfig } from './bar-chart-card-config';
 
@@ -29,6 +29,31 @@ export function buildBars(res: PrometheusResponse | null, c: BarChartCardConfig)
   });
   const maxVal = bars.reduce((m, d) => Math.max(m, d.value), 0);
   return { bars, max: c.max || maxVal || 100 };
+}
+
+/**
+ * Gradient fill by thresholds: threshold colours blended along the whole scale (0..max, like a
+ * Grafana bar gauge), so a bar shows the colours up to its value. `null` when there is nothing to blend.
+ * The fill element is `pct`% of the track: the gradient is scaled to the full track length.
+ */
+export function gradientFill(
+  thresholds: ThresholdConfig[] | undefined,
+  max: number,
+  pct: number,
+  vertical: boolean
+): string | null {
+  if (!thresholds || thresholds.length < 2 || pct <= 0 || !(max > 0)) return null;
+  const sorted = [...thresholds].sort((a, b) => a.value - b.value);
+  const at = (v: number) => Math.max(0, Math.min(100, (v / max) * 100));
+  const stops = sorted.map((t, i) => {
+    const color = stepColor(t) || GRAFANA_CLASSIC[0];
+    // the base step starts the gradient, the others blend in at their value
+    return `${color} ${i === 0 ? 0 : at(t.value).toFixed(2)}%`;
+  });
+  const size = `${((100 / pct) * 100).toFixed(2)}%`;
+  return vertical
+    ? `linear-gradient(0deg, ${stops.join(', ')}) left bottom / 100% ${size} no-repeat`
+    : `linear-gradient(90deg, ${stops.join(', ')}) left top / ${size} 100% no-repeat`;
 }
 
 /** Fill of a bar in percent of the track (0..100). */

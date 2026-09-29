@@ -15,4 +15,6 @@ export interface BarChartCardConfig extends BaseCardConfig {
   transparent_track?: boolean;
   /** with a transparent track: value right after the end of the bar instead of a column */
   value_at_end?: boolean;
+  /** colour mode `thresholds`: threshold colours blended along the bar (like a bar gauge), default false */
+  gradient?: boolean;
 }

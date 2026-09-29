@@ -15,7 +15,6 @@ export class StateTimelineCard extends BasePrometheusCard<StateTimelineCardConfi
   @state() private _rows: TimelineRow[] = [];
   @state() private _range: [number, number] = [0, 0];
   @state() private _loaded = false;
-  @state() private _hover = '';
 
   static get styles() {
     return [cardStyles, stateTimelineStyles];
@@ -97,7 +96,6 @@ export class StateTimelineCard extends BasePrometheusCard<StateTimelineCardConfi
             class="segment ${s.color === 'transparent' ? 'clear' : ''}"
             style="left:${left}%;width:${width}%;background:${s.color}"
             title=${tip}
-            @mouseenter=${() => (this._hover = tip)}
           >
             ${showValues && width > 6 ? html`<span>${s.text}</span>` : nothing}
           </div>`;
@@ -135,12 +133,10 @@ export class StateTimelineCard extends BasePrometheusCard<StateTimelineCardConfi
               <div
                 class="timeline ${this._fixedHeight() && !c.row_height ? 'fill auto' : ''}"
                 style=${c.row_height ? `--row-height: ${c.row_height}px` : ''}
-                @mouseleave=${() => (this._hover = '')}
               >
                 ${this._rows.map((r) => this._renderRow(r))}
                 <div class="axis">${ticks.map((t) => html`<span>${this._tick(t)}</span>`)}</div>
               </div>
-              <div class="tooltip">${this._hover}</div>
               ${c.show_legend !== false ? this._renderLegend() : nothing}
             `
           : html`<div class="placeholder-state">${localize('no_data', this._hass)}</div>`}

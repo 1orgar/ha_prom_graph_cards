@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { migrateConfig, rowsForHeight } from '../src/utils/migrate';
 import { buildChartData, niceStep, yRange, yTicks } from '../src/cards/timeseries-card/timeseries-data';
-import { barPercent, buildBars } from '../src/cards/bar-chart-card/bar-data';
+import { barPercent, buildBars, gradientFill } from '../src/cards/bar-chart-card/bar-data';
 import { getThresholdColor } from '../src/utils/color';
 import { mapValue } from '../src/utils/mappings';
 import { activeFor, durationSeconds, filterAlerts, groupAlerts } from '../src/cards/alerts-card/alerts-data';
@@ -81,6 +81,18 @@ describe('bar chart', () => {
     expect(max).toBe(5);
     expect(barPercent(2.5, 5)).toBe(50);
     expect(barPercent(10, 5)).toBe(100);
+  });
+
+  it('gradient by thresholds is laid out on the whole scale', () => {
+    const th = [{ value: 0, color: 'green' }, { value: 50, color: '#FF9830' }, { value: 80, color: 'red' }];
+    // bar filled to 50% of the track: gradient stretched to 200% of the fill
+    const g = gradientFill(th, 100, 50, false)!;
+    expect(g).toBe('linear-gradient(90deg, #73BF69 0%, #FF9830 50.00%, #F2495C 80.00%) left top / 200.00% 100% no-repeat');
+    expect(gradientFill(th, 100, 25, true)).toContain('linear-gradient(0deg');
+    expect(gradientFill(th, 100, 25, true)).toContain('100% 400.00%');
+    // nothing to blend
+    expect(gradientFill([{ value: 0, color: 'green' }], 100, 50, false)).toBeNull();
+    expect(gradientFill(th, 100, 0, false)).toBeNull();
   });
 });
 

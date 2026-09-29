@@ -162,6 +162,12 @@ unit: bytes
 # bar_height: 24           # empty = auto (bars share a fixed panel height)
 transparent_track: true    # no background for the unfilled part
 value_at_end: true         # value right after the bar end (needs transparent_track)
+max: 16000000000
+gradient: true             # threshold colours blended along the bar (colour mode "thresholds")
+thresholds:
+  - { value: 0, color: green }
+  - { value: 8000000000, color: yellow }
+  - { value: 12000000000, color: red }
 ```
 
 ```yaml
