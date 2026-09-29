@@ -42,6 +42,15 @@ export function rangeWindow(range: string, maxPoints = 500, now = Date.now()): {
   return { start, end, step: `${step}s` };
 }
 
+/** One-line axis label: `HH:MM` (24h), `DD.MM HH:MM` for ranges over a day, `DD.MM` over 2 days. */
+export function timeLabel(ts: number, span: number, language?: string): string {
+  const d = new Date(ts * 1000);
+  const time = d.toLocaleTimeString(language, { hour: '2-digit', minute: '2-digit', hour12: false });
+  if (span <= 86400) return time;
+  const date = d.toLocaleDateString(language, { day: '2-digit', month: '2-digit' });
+  return span > 2 * 86400 ? date : `${date} ${time}`;
+}
+
 export function formatTimestamp(ts: number): string {
   const date = new Date(ts * 1000);
   return date.toLocaleTimeString(undefined, {

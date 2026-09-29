@@ -16,23 +16,46 @@ function parseLe(le: string): number {
   return Number.isFinite(v) ? v : NaN;
 }
 
-function formatLe(v: number): string {
+export function formatLe(v: number): string {
   if (v === Infinity) return '+Inf';
   return String(parseFloat(v.toPrecision(4)));
 }
 
 /**
+ * Query returns raw bucket counters (no rate / increase / delta applied)?
+ * Then values only ever grow and have to be converted to per-step increases.
+ */
+export function isRawCounterQuery(query?: string): boolean {
+  if (!query || !/_bucket\b/.test(query)) return false;
+  return !/\b(rate|irate|increase|delta|idelta|deriv)\s*\(/.test(query);
+}
+
+/** Counter -> increase between neighbouring samples (counter resets handled like Prometheus). */
+export function counterIncrease(values: (number | null)[]): (number | null)[] {
+  let prev: number | null = null;
+  return values.map((v) => {
+    if (v === null) return null;
+    const out: number | null = prev === null ? null : v >= prev ? v - prev : v;
+    prev = v;
+    return out;
+  });
+}
+
+/**
  * Build a heatmap.
  * - `histogram`: series with an `le` label (cumulative buckets, e.g.
- *   `sum by (le) (rate(x_bucket[5m]))`) -> per-bucket counts (de-cumulated).
+ *   `sum by (le) (rate(x_bucket[5m]))`) -> per-bucket values (de-cumulated).
+ *   Series that were not aggregated (other labels left) are summed per `le`, all of them are
+ *   used (no series limit). With `counters` the raw counters are first turned into increases.
  * - `series`: every series is a row (label from `legend`).
  */
 export function buildHeatmap(
   res: PrometheusResponse | null | undefined,
   mode: 'histogram' | 'series',
-  legend?: string
+  legend?: string,
+  counters = false
 ): HeatmapModel {
-  const series = parseRange(res, legend);
+  const series = parseRange(res, legend, undefined, mode === 'histogram' ? Infinity : undefined);
   const timeSet = new Set<number>();
   series.forEach((s) => s.points.forEach(([t]) => timeSet.add(t)));
   const times = [...timeSet].sort((a, b) => a - b);
@@ -47,23 +70,31 @@ export function buildHeatmap(
     for (const s of series) {
       const le = parseLe(s.metric.le ?? '');
       if (Number.isNaN(le)) continue;
+      let values: (number | null)[] = new Array(times.length).fill(null);
+      for (const [t, v] of s.points) values[idx.get(t)!] = v;
+      if (counters) values = counterIncrease(values);
       const col = byLe.get(le) ?? new Array(times.length).fill(null);
-      for (const [t, v] of s.points) {
-        if (v === null) continue;
-        const i = idx.get(t)!;
-        col[i] = (col[i] ?? 0) + v;
-      }
+      values.forEach((v, i) => {
+        if (v !== null) col[i] = (col[i] ?? 0) + v;
+      });
       byLe.set(le, col);
     }
     const les = [...byLe.keys()].sort((a, b) => a - b);
-    rows = les.map((le, i) => (i === 0 ? `≤ ${formatLe(le)}` : `${formatLe(les[i - 1])} – ${formatLe(le)}`));
+    // axis shows the bucket upper bound only (`le`), like Grafana
+    rows = les.map((le) => formatLe(le));
     cells = les.map((le, i) => {
       const cur = byLe.get(le)!;
       if (i === 0) return cur;
       const prev = byLe.get(les[i - 1])!;
-      // cumulative -> per bucket; negative (counter resets / jitter) clamped to 0
+      // cumulative -> per bucket; negative (scrape jitter between buckets) clamped to 0
       return cur.map((v, t) => (v === null ? null : Math.max(0, v - (prev[t] ?? 0))));
     });
+    // drop leading time columns without any value (first sample of counters)
+    const first = times.findIndex((_t, ti) => cells.some((row) => row[ti] !== null));
+    if (first > 0) {
+      times.splice(0, first);
+      cells = cells.map((row) => row.slice(first));
+    }
   } else {
     rows = series.map((s) => (legend ? s.label : formatLegend(s.metric)));
     cells = series.map((s) => {

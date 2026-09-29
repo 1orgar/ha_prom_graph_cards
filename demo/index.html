@@ -27,12 +27,18 @@
       wrap.className = 'shot';
       wrap.id = demo.id;
       wrap.style.width = `${demo.width}px`;
-      const tag = demo.config.type.replace('custom:', '');
-      await customElements.whenDefined(tag);
-      const el = document.createElement(tag);
-      el.setConfig(demo.config);
-      el.hass = hass;
-      wrap.appendChild(el);
+      // `row`: several cards side by side (height alignment demo)
+      const items = demo.row || [{ config: demo.config }];
+      if (demo.row) Object.assign(wrap.style, { display: 'flex', gap: '12px', alignItems: 'flex-start' });
+      for (const item of items) {
+        const tag = item.config.type.replace('custom:', '');
+        await customElements.whenDefined(tag);
+        const el = document.createElement(tag);
+        el.setConfig(item.config);
+        el.hass = hass;
+        if (item.width) el.style.width = `${item.width}px`;
+        wrap.appendChild(el);
+      }
       document.body.appendChild(wrap);
     }
     window.__demoReady = true;

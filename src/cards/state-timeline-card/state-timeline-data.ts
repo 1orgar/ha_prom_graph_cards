@@ -1,4 +1,4 @@
-import { PrometheusResponse, SeriesConfig } from '../../types';
+import { PrometheusResponse } from '../../types';
 import { MAX_SERIES, parseRange } from '../../utils/series';
 import { shortLabel } from '../../utils/format';
 import { mapValue, MappedState } from '../../utils/mappings';
@@ -44,25 +44,18 @@ function toSegments(
   return out;
 }
 
-/** One row per returned series; label from the query "Name" field (text or `{{label}}`). */
+/** One row per returned series; row label from `legend_format` (`{{label}}`). */
 export function buildTimeline(
-  responses: (PrometheusResponse | null)[],
-  queries: SeriesConfig[],
+  res: PrometheusResponse | null,
   c: StateTimelineCardConfig,
   step: number,
   end: number
 ): TimelineRow[] {
-  const raw: { label: string; points: [number, number | null][] }[] = [];
-  responses.forEach((res, qi) => {
-    const name = queries[qi].name?.trim();
-    const template = name && name.includes('{{') ? name : undefined;
-    const parsed = parseRange(res, template);
-    for (const s of parsed) {
-      let label = template ? s.label : shortLabel(s.metric);
-      if (name && !template) label = parsed.length > 1 ? `${name} ${shortLabel(s.metric)}` : name;
-      raw.push({ label, points: s.points });
-    }
-  });
+  const template = c.legend_format?.trim() || undefined;
+  const raw = parseRange(res, template).map((s) => ({
+    label: shortLabel(s.metric, template),
+    points: s.points
+  }));
 
   const distinct = Array.from(
     new Set(raw.flatMap((r) => r.points.map((p) => p[1]).filter((v): v is number => v !== null)))

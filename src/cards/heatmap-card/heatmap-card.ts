@@ -3,7 +3,7 @@ import { customElement, query, state } from 'lit/decorators.js';
 import { BasePrometheusCard } from '../../shared/base-prometheus-card';
 import { cardStyles } from '../../shared/card-styles';
 import { BaseCardConfig } from '../../types';
-import { buildHeatmap, HEATMAP_SCHEMES, HeatmapModel } from './heatmap-data';
+import { buildHeatmap, HEATMAP_SCHEMES, HeatmapModel, isRawCounterQuery } from './heatmap-data';
 import { drawHeatmap, hitTest } from './heatmap-draw';
 import { formatValue } from '../../utils/format';
 import { rangeWindow } from '../../utils/time';
@@ -16,8 +16,10 @@ export interface HeatmapCardConfig extends BaseCardConfig {
   heatmap_mode?: 'histogram' | 'series';
   color_scheme?: keyof typeof HEATMAP_SCHEMES;
   log_scale?: boolean;
-  height?: number;
+  height?: number;          // chart height px when the panel height is auto, default 200
   show_legend_scale?: boolean;
+  /** raw `_bucket` counters: convert to increases (`auto` detects queries without rate/increase) */
+  counters?: 'auto' | 'yes' | 'no';
 }
 
 @customElement('prometheus-heatmap-card')
@@ -31,9 +33,10 @@ export class HeatmapCard extends BasePrometheusCard<HeatmapCardConfig> {
     return [
       cardStyles,
       css`
-        ha-card { padding: 12px 16px; gap: 6px; }
-        .name { font-size: 14px; font-weight: 500; color: var(--secondary-text-color); }
+        .plot { position: relative; }
+        .plot.fill { flex: 1 1 auto; min-height: 60px; }
         canvas { width: 100%; display: block; }
+        .plot.fill canvas { position: absolute; inset: 0; height: 100%; }
         .foot { display: flex; justify-content: space-between; align-items: center; gap: 8px;
           font-size: 11px; color: var(--secondary-text-color); min-height: 16px; }
         .scale { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
@@ -45,7 +48,7 @@ export class HeatmapCard extends BasePrometheusCard<HeatmapCardConfig> {
   static getStubConfig(): Partial<HeatmapCardConfig> {
     return {
       type: 'custom:prometheus-heatmap-card',
-      name: 'Request duration',
+      title: 'Request duration',
       query: 'sum by (le) (rate(prometheus_http_request_duration_seconds_bucket[5m]))',
       heatmap_mode: 'histogram',
       time_range: '6h'
@@ -56,8 +59,8 @@ export class HeatmapCard extends BasePrometheusCard<HeatmapCardConfig> {
     return document.createElement('prometheus-heatmap-card-editor');
   }
 
-  public getGridOptions() {
-    return { columns: 12, rows: 'auto' as const, min_columns: 6 };
+  protected _defaultColumns(): number {
+    return 12;
   }
 
   disconnectedCallback() {
@@ -72,7 +75,8 @@ export class HeatmapCard extends BasePrometheusCard<HeatmapCardConfig> {
       this._loading = true;
       const { start, end, step } = rangeWindow(c.time_range || '6h', 120);
       const res = await this._client.rangeQuery(c.query!, start, end, step);
-      this._model = buildHeatmap(res, c.heatmap_mode || 'histogram', c.legend_format);
+      const counters = c.counters === 'yes' || ((c.counters || 'auto') === 'auto' && isRawCounterQuery(c.query));
+      this._model = buildHeatmap(res, c.heatmap_mode || 'histogram', c.legend_format, counters);
       this._error = undefined;
     } catch (e: any) {
       this._error = this._formatError(e);
@@ -85,7 +89,7 @@ export class HeatmapCard extends BasePrometheusCard<HeatmapCardConfig> {
     super.updated(changed);
     if (this._canvas && !this._resize && typeof ResizeObserver !== 'undefined') {
       this._resize = new ResizeObserver(() => this._draw());
-      this._resize.observe(this._canvas);
+      this._resize.observe(this._canvas.parentElement || this._canvas);
     }
     if (changed.has('_model') || changed.has('_config')) this._draw();
   }
@@ -94,7 +98,7 @@ export class HeatmapCard extends BasePrometheusCard<HeatmapCardConfig> {
     const m = this._model;
     if (!m || !this._canvas || !m.times.length || !m.rows.length) return;
     drawHeatmap(this._canvas, m, {
-      height: this._config.height || 200,
+      height: this._plotHeight(),
       scheme: this._config.color_scheme || 'oranges',
       log: Boolean(this._config.log_scale),
       textColor: getComputedStyle(this).getPropertyValue('--secondary-text-color').trim() || '#888',
@@ -102,10 +106,16 @@ export class HeatmapCard extends BasePrometheusCard<HeatmapCardConfig> {
     });
   }
 
+  private _plotHeight(): number {
+    const parent = this._canvas?.parentElement;
+    if (this._fixedHeight() && parent?.clientHeight) return Math.max(60, parent.clientHeight);
+    return this._config.height || 200;
+  }
+
   private _onMove(ev: MouseEvent) {
     const m = this._model;
     if (!m || !this._canvas) return;
-    const hit = hitTest(m, this._canvas.getBoundingClientRect(), ev.clientX, ev.clientY, this._config.height || 200);
+    const hit = hitTest(m, this._canvas.getBoundingClientRect(), ev.clientX, ev.clientY, this._plotHeight(), (this._canvas as any).__labelW);
     if (!hit) {
       this._hover = '';
       return;
@@ -113,7 +123,8 @@ export class HeatmapCard extends BasePrometheusCard<HeatmapCardConfig> {
     const [r, t] = hit;
     const v = m.cells[r][t];
     const time = new Date(m.times[t] * 1000).toLocaleString(this._hass?.locale?.language);
-    this._hover = `${m.rows[r]} · ${time} · ${v === null ? '-' : formatValue(v, this._config.decimals, this._config.unit)}`;
+    const row = (this._config.heatmap_mode || 'histogram') === 'histogram' ? `le ${m.rows[r]}` : m.rows[r];
+    this._hover = `${row} · ${time} · ${v === null ? '-' : formatValue(v, this._config.decimals, this._config.unit)}`;
   }
 
   render() {
@@ -125,9 +136,11 @@ export class HeatmapCard extends BasePrometheusCard<HeatmapCardConfig> {
     const stops = (HEATMAP_SCHEMES[c.color_scheme || 'oranges'] || HEATMAP_SCHEMES.oranges).join(', ');
     return html`
       <ha-card>
-        ${c.name ? html`<div class="name">${c.name}</div>` : nothing}
+        ${this.renderHeader()}
         ${m.times.length && m.rows.length
-          ? html`<canvas @mousemove=${this._onMove} @mouseleave=${() => (this._hover = '')}></canvas>
+          ? html`<div class="plot ${this._fixedHeight() ? 'fill' : ''}">
+                <canvas @mousemove=${this._onMove} @mouseleave=${() => (this._hover = '')}></canvas>
+              </div>
               <div class="foot">
                 <span>${this._hover}</span>
                 ${c.show_legend_scale !== false

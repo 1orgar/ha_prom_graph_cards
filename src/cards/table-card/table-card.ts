@@ -32,9 +32,10 @@ export class TableCard extends BasePrometheusCard<TableCardConfig> {
     return [
       cardStyles,
       css`
-        ha-card { padding: 12px 0 8px; gap: 6px; }
-        .name { padding: 0 16px; font-size: 14px; font-weight: 500; color: var(--secondary-text-color); }
+        ha-card { padding: 16px 0 8px; }
+        .card-header { padding: 0 16px; }
         .wrap { overflow: auto; max-height: var(--table-max-height, 420px); }
+        .wrap.fill { max-height: none; }
         table { width: 100%; border-collapse: collapse; font-size: 13px; }
         th { position: sticky; top: 0; background: var(--card-background-color, #fff); text-align: left;
           font-weight: 500; color: var(--secondary-text-color); padding: 6px 12px; cursor: pointer;
@@ -51,7 +52,7 @@ export class TableCard extends BasePrometheusCard<TableCardConfig> {
   static getStubConfig(): Partial<TableCardConfig> {
     return {
       type: 'custom:prometheus-table-card',
-      name: 'Targets',
+      title: 'Targets',
       query: 'up',
       columns: ['job', 'instance'],
       thresholds: [{ value: 0, color: '#F2495C' }, { value: 1, color: '#73BF69' }],
@@ -63,8 +64,8 @@ export class TableCard extends BasePrometheusCard<TableCardConfig> {
     return document.createElement('prometheus-table-card-editor');
   }
 
-  public getGridOptions() {
-    return { columns: 12, rows: 'auto' as const, min_columns: 6 };
+  protected _defaultColumns(): number {
+    return 12;
   }
 
   protected async _fetchData(): Promise<void> {
@@ -119,9 +120,9 @@ export class TableCard extends BasePrometheusCard<TableCardConfig> {
     const rows = this._rows();
     return html`
       <ha-card>
-        ${c.name ? html`<div class="name">${c.name}</div>` : nothing}
+        ${this.renderHeader()}
         ${rows.length
-          ? html`<div class="wrap"><table>
+          ? html`<div class="wrap ${this._fixedHeight() ? 'fill' : ''}"><table>
               <thead><tr>
                 ${columns.map((col) => this._th(col, col === '__name__' ? 'metric' : col))}
                 ${this._th('__value__', c.value_column || localize('value', this._hass), true)}

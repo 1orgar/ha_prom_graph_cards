@@ -1,19 +1,9 @@
 import { css } from 'lit';
 
 export const gaugeStyles = css`
-  ha-card {
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-  .name {
-    font-size: 14px;
-    color: var(--secondary-text-color);
-    font-weight: 500;
-  }
   .gauges {
     display: grid;
+    align-content: center;
     grid-template-columns: repeat(auto-fit, minmax(var(--gauge-min, 120px), 1fr));
     gap: 12px 16px;
     justify-items: center;
@@ -30,6 +20,14 @@ export const gaugeStyles = css`
     position: relative;
     width: 100%;
     aspect-ratio: 100 / 60;
+  }
+  /* fixed-height panel: the gauge is limited by the available height too */
+  .gauges.fill .gauge-container {
+    width: min(100%, calc((100cqh - 24px) * 100 / 60));
+    margin: 0 auto;
+  }
+  .gauges.fill {
+    container-type: size;
   }
   .gauge-svg {
     width: 100%;

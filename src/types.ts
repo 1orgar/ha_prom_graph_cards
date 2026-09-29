@@ -51,15 +51,15 @@ export interface PrometheusResult {
 export interface ThresholdConfig {
   value: number;
   color: string;
+  /** no colour (e.g. hide the "normal" state on a state timeline) */
+  transparent?: boolean;
 }
 
+/** @deprecated v0.6: one query per panel (`query` + `legend_format`); read for migration only */
 export interface SeriesConfig {
   query: string;
-  /** Legend: plain text or Grafana legend format, e.g. `{{instance}} rx` */
   name?: string;
-  /** Fixed colour (used when the query returns a single series) */
   color?: string;
-  /** @deprecated v0.2, use card level `fill_opacity` */
   fill?: boolean;
 }
 
@@ -77,7 +77,11 @@ export const INTEGRATION_DOMAIN = 'prometheus_dashboard';
 export interface BaseCardConfig {
   type: string;
   entry_id?: string;
+  /** The one PromQL query of the panel */
   query?: string;
+  /** Panel title (same look on every card) */
+  title?: string;
+  /** @deprecated v0.6: use `title` (still read) */
   name?: string;
   refresh_interval?: number;  // seconds, default 30
   unit?: string;              // Grafana unit id (see utils/units.ts) or custom suffix
@@ -85,6 +89,8 @@ export interface BaseCardConfig {
   legend_format?: string;     // `{{label}}` template for series labels
   palette?: PaletteOption;    // colour scheme for multiple series
   transparent?: boolean;      // no card background / shadow
+  /** Panel height in px; empty = auto (content height / height set by the Sections layout) */
+  card_height?: number;
 }
 
 /** Value mapping (state timeline, stat): exact value or numeric range -> text + colour */
@@ -94,4 +100,5 @@ export interface ValueMapping {
   to?: number;
   text?: string;
   color?: string;
+  transparent?: boolean;
 }

@@ -21,14 +21,15 @@ export const pieStyles = css`
       width: min(var(--pie-size, 180px), 70cqw);
     }
   }
-  ha-card {
-    padding: 16px;
-    gap: 12px;
+  /* fixed-height panel: the chart is limited by the available height */
+  .body.fill {
+    flex: 1 1 auto;
+    min-height: 0;
   }
-  .header {
-    font-size: 1.2rem;
-    font-weight: 500;
-    color: var(--primary-text-color);
+  .body.fill .chart {
+    width: auto;
+    height: min(100%, var(--pie-size, 180px));
+    max-height: 100%;
   }
   .body {
     display: flex;

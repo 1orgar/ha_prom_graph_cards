@@ -1,21 +1,27 @@
 import { css } from 'lit';
 
 export const stateTimelineStyles = css`
-  ha-card {
-    padding: 16px;
-    gap: 8px;
-  }
-  .header {
-    font-size: 1.2rem;
-    font-weight: 500;
-    color: var(--primary-text-color);
-  }
   .timeline {
     display: grid;
     grid-template-columns: minmax(0, max-content) 1fr;
     column-gap: 8px;
     row-gap: 4px;
     align-items: center;
+  }
+  /* auto row height in a fixed-height panel: rows share the height */
+  .timeline.fill.auto {
+    grid-auto-rows: minmax(10px, 1fr);
+    align-items: stretch;
+  }
+  .timeline.fill.auto .row-bar {
+    height: auto;
+    max-height: 80px;
+  }
+  .timeline.fill.auto .row-label {
+    align-self: center;
+  }
+  .timeline.fill.auto .axis {
+    align-self: start;
   }
   .row-label {
     font-size: 12px;
@@ -57,6 +63,7 @@ export const stateTimelineStyles = css`
     justify-content: space-between;
     font-size: 10px;
     color: var(--secondary-text-color);
+    white-space: nowrap;
   }
   .legend {
     display: flex;
@@ -74,6 +81,16 @@ export const stateTimelineStyles = css`
     width: 12px;
     height: 12px;
     border-radius: 3px;
+    box-sizing: border-box;
+  }
+  /* transparent state: outlined square in the legend */
+  .legend-color.clear {
+    border: 1px dashed var(--secondary-text-color);
+  }
+  .segment.clear {
+    color: var(--secondary-text-color);
+    text-shadow: none;
+    box-shadow: none;
   }
   .tooltip {
     font-size: 12px;

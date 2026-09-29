@@ -102,12 +102,53 @@ export const TRANSPARENT_SCHEMA: HaFormSchema = {
   selector: { boolean: {} }
 };
 
-/** Standard "Advanced" section: refresh interval + transparent background (+ extra fields). */
-export function advancedSection(...extra: HaFormSchema[]): { title: string; schema: HaFormSchema[] } {
+export const TITLE_SCHEMA: HaFormSchema = { name: 'title', selector: { text: {} } };
+
+export const CARD_HEIGHT_SCHEMA: HaFormSchema = {
+  name: 'card_height',
+  selector: { number: { min: 60, max: 2000, step: 1, mode: 'box', unit_of_measurement: 'px' } }
+};
+
+export const TIME_RANGE_OPTIONS = ['15m', '30m', '1h', '3h', '6h', '12h', '24h', '2d', '7d', '30d'];
+
+export const TIME_RANGE_SCHEMA: HaFormSchema = {
+  name: 'time_range',
+  selector: { select: { mode: 'dropdown', custom_value: true, options: TIME_RANGE_OPTIONS } }
+};
+
+export const STEP_SCHEMA: HaFormSchema = { name: 'step', selector: { text: {} } };
+
+type Section = { title: string; schema: HaFormSchema[] };
+
+/**
+ * Block 1 "Panel": title, height, background - how the HA card itself looks.
+ * `extra` = card specific panel fields (e.g. icon).
+ */
+export function panelSection(...extra: HaFormSchema[]): Section {
   return {
-    title: 'section_advanced',
-    schema: [{ name: '', type: 'grid', schema: [REFRESH_SCHEMA, ...extra, TRANSPARENT_SCHEMA] }]
+    title: 'section_panel',
+    schema: [
+      TITLE_SCHEMA,
+      { name: '', type: 'grid', schema: [CARD_HEIGHT_SCHEMA, TRANSPARENT_SCHEMA, ...extra] }
+    ]
   };
+}
+
+/**
+ * Block 2 "Query": server, PromQL, legend format, refresh interval, time range...
+ * `extra` = card specific query fields (time range, step, reduce...).
+ */
+export function querySection(opts: { legend?: boolean; query?: boolean } = {}, ...extra: HaFormSchema[]): Section {
+  const grid: HaFormSchema[] = [...(opts.legend === false ? [] : [LEGEND_FORMAT_SCHEMA]), REFRESH_SCHEMA, ...extra];
+  return {
+    title: 'section_query',
+    schema: [ENTRY_SCHEMA, ...(opts.query === false ? [] : [QUERY_SCHEMA]), { name: '', type: 'grid', schema: grid }]
+  };
+}
+
+/** Block 3 "Display": everything about how the returned series are drawn. */
+export function displaySection(...schema: HaFormSchema[]): Section {
+  return { title: 'section_display', schema: [{ name: '', type: 'grid', schema }] };
 }
 
 export const DECIMALS_SCHEMA: HaFormSchema = {
@@ -151,4 +192,3 @@ export function colorModeSchema(hass?: HomeAssistant): HaFormSchema {
   };
 }
 
-export const TIME_RANGE_OPTIONS = ['15m', '30m', '1h', '3h', '6h', '12h', '24h', '2d', '7d', '30d'];

@@ -7,6 +7,8 @@ export interface PrometheusAlert {
   state: 'firing' | 'pending' | 'inactive';
   activeAt?: string;
   value?: string;
+  /** `home_assistant` for PromQL alerts defined in the integration (not Prometheus rules) */
+  source?: string;
 }
 
 export interface MetadataEntry {

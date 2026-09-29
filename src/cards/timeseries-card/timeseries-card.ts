@@ -7,14 +7,16 @@ import { BasePrometheusCard } from '../../shared/base-prometheus-card';
 import { cardStyles } from '../../shared/card-styles';
 import { TimeseriesCardConfig } from './timeseries-card-config';
 import { timeseriesStyles } from './timeseries-card-styles';
-import { buildChartData, ChartData, ChartSeries, toAligned } from './timeseries-data';
+import { buildChartData, ChartData, ChartSeries, toAligned, unitBase, yRange, yTicks } from './timeseries-data';
 import { formatValue } from '../../utils/format';
-import { withAlpha } from '../../utils/color';
-import { rangeWindow } from '../../utils/time';
+import { stepColor, withAlpha } from '../../utils/color';
+import { rangeWindow, timeLabel } from '../../utils/time';
 import { localize } from '../../localize';
 import './timeseries-card-editor';
 
 type LegendStat = 'last' | 'min' | 'max' | 'mean';
+
+const DEFAULT_HEIGHT = 200;
 
 @customElement('prometheus-timeseries-card')
 export class TimeseriesCard extends BasePrometheusCard<TimeseriesCardConfig> {
@@ -36,9 +38,10 @@ export class TimeseriesCard extends BasePrometheusCard<TimeseriesCardConfig> {
     return {
       type: 'custom:prometheus-timeseries-card',
       title: 'Scrape duration',
+      query: 'scrape_duration_seconds',
+      legend_format: '{{job}}',
       time_range: '1h',
-      unit: 's',
-      series: [{ query: 'scrape_duration_seconds', name: '{{job}}' }]
+      unit: 's'
     };
   }
 
@@ -47,21 +50,17 @@ export class TimeseriesCard extends BasePrometheusCard<TimeseriesCardConfig> {
   }
 
   public setConfig(config: TimeseriesCardConfig): void {
-    const series = Array.isArray(config.series) ? config.series : [];
-    super.setConfig({ ...config, series });
+    super.setConfig(config);
     this._destroyChart();
   }
 
-  protected _hasQuery(): boolean {
-    return Boolean(this._config?.series?.some((s) => s && s.query && s.query.trim()));
-  }
-
-  public getGridOptions() {
-    return { columns: 12, rows: 'auto' as const, min_columns: 6 };
+  protected _defaultColumns(): number {
+    return 12;
   }
 
   public getCardSize(): number {
-    return Math.ceil(((this._config?.height || 200) + 100) / 50);
+    if (this._config?.card_height) return super.getCardSize();
+    return Math.ceil(((this._config?.height || DEFAULT_HEIGHT) + 100) / 50);
   }
 
   disconnectedCallback() {
@@ -105,16 +104,77 @@ export class TimeseriesCard extends BasePrometheusCard<TimeseriesCardConfig> {
     return v === null || v === undefined ? '-' : formatValue(v, this._config.decimals, this._config.unit);
   }
 
+  /** Chart height: the rest of a fixed-height panel, otherwise `height` (default 200). */
+  private _chartHeight(): number {
+    if (this._fixedHeight() && this._chartContainer) {
+      return Math.max(60, Math.floor(this._chartContainer.clientHeight));
+    }
+    return this._config.height || DEFAULT_HEIGHT;
+  }
+
+  /** Data min / max of visible (and stacked) values. */
+  private _dataExtent(aligned: uPlot.AlignedData): [number | null, number | null] {
+    let min: number | null = null;
+    let max: number | null = null;
+    for (let i = 1; i < aligned.length; i++) {
+      for (const v of aligned[i] as (number | null)[]) {
+        if (v === null || v === undefined) continue;
+        min = min === null ? v : Math.min(min, v);
+        max = max === null ? v : Math.max(max, v);
+      }
+    }
+    return [min, max];
+  }
+
+  /** Thresholds as dashed lines / coloured bands, drawn under the series. */
+  private _drawThresholds(u: uPlot) {
+    const c = this._config;
+    const style = c.threshold_style || 'off';
+    const thresholds = [...(c.thresholds || [])].sort((a, b) => a.value - b.value);
+    if (style === 'off' || !thresholds.length) return;
+    const ctx = u.ctx;
+    const { left, top, width, height } = u.bbox;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(left, top, width, height);
+    ctx.clip();
+    thresholds.forEach((t, i) => {
+      const color = stepColor(t);
+      if (!color || color === 'transparent') return;
+      const y = u.valToPos(t.value, 'y', true);
+      if (style === 'area') {
+        const next = thresholds[i + 1];
+        const y2 = next ? u.valToPos(next.value, 'y', true) : top;
+        ctx.fillStyle = withAlpha(color, 0.12);
+        ctx.fillRect(left, Math.min(y, y2), width, Math.abs(y - y2));
+      } else if (i > 0 || thresholds.length === 1) {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = devicePixelRatio || 1;
+        ctx.setLineDash([6 * (devicePixelRatio || 1), 4 * (devicePixelRatio || 1)]);
+        ctx.beginPath();
+        ctx.moveTo(left, y);
+        ctx.lineTo(left + width, y);
+        ctx.stroke();
+      }
+    });
+    ctx.restore();
+  }
+
   private _initChart() {
     if (!this._chartContainer || !this._config) return;
     const c = this._config;
     const width = this._chartContainer.clientWidth || 400;
-    const height = c.height || 200;
+    const height = this._chartHeight();
     const textColor = this._cssVar('--secondary-text-color', '#888');
     const gridColor = this._cssVar('--divider-color', 'rgba(127,127,127,0.2)');
     const lineWidth = c.line_width ?? 2;
-    const fillOn = c.fill || c.stacked || c.series.some((s) => s.fill);
+    const fillOn = c.fill || c.stacked;
     const opacity = Math.max(0, Math.min(100, c.fill_opacity ?? 20)) / 100;
+    const showX = c.show_x_axis !== false;
+    const showY = c.show_y_axis !== false;
+    const grid = c.show_grid !== false ? { stroke: gridColor, width: 1 } : { show: false };
+    const language = this._hass?.locale?.language;
+    const base = unitBase(c.unit);
 
     const series: uPlot.Series[] = [{}];
     this._data.series.forEach((s) => {
@@ -130,12 +190,30 @@ export class TimeseriesCard extends BasePrometheusCard<TimeseriesCardConfig> {
     });
 
     const axes: uPlot.Axis[] = [
-      { stroke: textColor, grid: { stroke: gridColor, width: 1 }, ticks: { stroke: gridColor, width: 1 } },
       {
+        show: showX,
         stroke: textColor,
-        size: 70,
-        grid: { stroke: gridColor, width: 1 },
-        ticks: { stroke: gridColor, width: 1 },
+        grid,
+        ticks: { show: false },
+        size: 24,
+        space: 70,
+        // always one line: HH:MM, or DD.MM for long ranges
+        values: (u, vals) => {
+          const span = (u.scales.x.max ?? 0) - (u.scales.x.min ?? 0);
+          return vals.map((v) => (v == null ? '' : timeLabel(v, span, language)));
+        }
+      },
+      {
+        show: showY,
+        stroke: textColor,
+        grid,
+        ticks: { show: false },
+        size: (u, values) => {
+          const longest = (values || []).reduce((m, v) => Math.max(m, String(v ?? '').length), 0);
+          return Math.max(36, Math.min(110, longest * 7 + 14));
+        },
+        // ticks start at the axis origin, so its value is always labelled
+        splits: (_u, _i, min, max) => yTicks(min, max, Math.max(2, Math.round(this._chartHeight() / 45)), base),
         values: (_u, vals) => vals.map((v) => (v == null ? '' : this._fmt(v)))
       }
     ];
@@ -146,18 +224,21 @@ export class TimeseriesCard extends BasePrometheusCard<TimeseriesCardConfig> {
       series,
       axes,
       legend: { show: false },
+      padding: [8, 8, showX ? 0 : 8, showY ? 0 : 8],
       scales: {
+        x: { time: true },
         y: {
-          range: (_u, dmin, dmax) => {
-            const min = c.min ?? (c.stacked ? Math.min(0, dmin) : dmin);
-            const max = c.max ?? dmax;
-            return min === max ? [min - 1, max + 1] : [min, max];
+          range: (u) => {
+            const [dmin, dmax] = this._dataExtent(u.data);
+            const ticks = Math.max(2, Math.round(this._chartHeight() / 45));
+            return yRange(dmin, dmax, { min: c.min, max: c.max, stacked: c.stacked, ticks, base });
           }
         }
       },
       cursor: { points: { size: 6 } },
       hooks: {
-        setCursor: [(u) => (this._cursorIdx = u.cursor.idx ?? null)]
+        setCursor: [(u) => (this._cursorIdx = u.cursor.idx ?? null)],
+        drawClear: [(u) => this._drawThresholds(u)]
       }
     };
 
@@ -165,26 +246,23 @@ export class TimeseriesCard extends BasePrometheusCard<TimeseriesCardConfig> {
     this._resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
         if (entry.target === this._chartContainer && this._chart && entry.contentRect.width > 0) {
-          this._chart.setSize({ width: entry.contentRect.width, height: this._config.height || 200 });
+          const size = { width: Math.floor(entry.contentRect.width), height: this._chartHeight() };
+          if (size.width !== this._chart.width || size.height !== this._chart.height) this._chart.setSize(size);
         }
       }
     });
     this._resizeObserver.observe(this._chartContainer);
   }
 
+
   protected async _fetchData(): Promise<void> {
-    const queries = this._config.series;
+    const c = this._config;
     try {
       this._loading = true;
-      const win = rangeWindow(this._config.time_range || '1h');
-      const { start, end } = win;
-      const step = this._config.step ? String(this._config.step) : win.step;
-      const responses = await Promise.all(
-        queries.map((s) =>
-          s.query && s.query.trim() ? this._client.rangeQuery(s.query, start, end, step) : Promise.resolve(null)
-        )
-      );
-      this._data = buildChartData(responses, queries, this._config.palette);
+      const win = rangeWindow(c.time_range || '1h');
+      const step = c.step ? String(c.step) : win.step;
+      const res = await this._client.rangeQuery(c.query!, win.start, win.end, step);
+      this._data = buildChartData(res, c.legend_format, c.palette);
       this._error = undefined;
     } catch (e: any) {
       this._error = this._formatError(e);
@@ -212,40 +290,38 @@ export class TimeseriesCard extends BasePrometheusCard<TimeseriesCardConfig> {
     return this._cursorIdx !== null ? s.values[this._cursorIdx] ?? null : s.stats.last;
   }
 
+  /** Current (hovered or last) value in the legend, `show_current` (default off). */
+  private _showCurrent(): boolean {
+    return this._config.show_current === true;
+  }
 
   protected render() {
-    if (!this._hasQuery()) return this.renderPlaceholder('no_series');
+    if (!this._hasQuery()) return this.renderPlaceholder();
+    const c = this._config;
     const hasData = this._data.times.length > 0;
+    const fixed = this._fixedHeight();
 
     let overlay: unknown = nothing;
     if (this._error) {
-      overlay = html`<div class="overlay error-state">${this._error}</div>`;
+      overlay = html`<div class="error-state">${this._error}</div>`;
     } else if (!hasData) {
-      overlay = html`<div class="overlay">
-        ${this._loading
-          ? html`<div class="loading-state"></div>`
-          : html`<div class="placeholder-state">${localize('no_data', this._hass)}</div>`}
-      </div>`;
+      overlay = this._loading
+        ? html`<div class="loading-state"></div>`
+        : html`<div class="placeholder-state">${localize('no_data', this._hass)}</div>`;
     }
+    const chartStyle = fixed ? '' : `height: ${hasData ? c.height || DEFAULT_HEIGHT : 0}px`;
 
     return html`
       <ha-card>
-        ${this._config.title ? html`<div class="header">${this._config.title}</div>` : nothing}
-        <div class="chart-container" style="min-height: ${hasData ? this._config.height || 200 : 0}px"></div>
+        ${this.renderHeader()}
+        <div class="chart-container ${fixed ? 'fill' : ''}" style=${chartStyle}></div>
         ${overlay}
-        ${this._config.show_legend !== false && hasData ? this._renderLegend() : nothing}
+        ${c.show_legend !== false && hasData ? this._renderLegend() : nothing}
       </ha-card>
     `;
   }
 
-  /** Current (hovered or last) value column, controlled by `show_current` (default on). */
-  private _showCurrent(): boolean {
-    return this._config.show_current !== false;
-  }
-
   private _renderLegendTable(stats: LegendStat[]) {
-    // `last` in the stats list is the static last value; the "current" column follows the cursor
-    const cols = stats;
     const showCurrent = this._showCurrent();
     return html`
       <div class="legend-table-wrap">
@@ -253,7 +329,7 @@ export class TimeseriesCard extends BasePrometheusCard<TimeseriesCardConfig> {
           <thead>
             <tr>
               <th></th>
-              ${cols.map((st) => html`<th>${localize(`legend_value_${st}`, this._hass)}</th>`)}
+              ${stats.map((st) => html`<th>${localize(`legend_value_${st}`, this._hass)}</th>`)}
               ${showCurrent ? html`<th>${localize('current', this._hass)}</th>` : nothing}
             </tr>
           </thead>
@@ -266,7 +342,7 @@ export class TimeseriesCard extends BasePrometheusCard<TimeseriesCardConfig> {
                       <span class="legend-color" style="background:${s.color}"></span><span>${s.label}</span>
                     </div>
                   </td>
-                  ${cols.map((st) => html`<td>${this._fmt(s.stats[st])}</td>`)}
+                  ${stats.map((st) => html`<td>${this._fmt(s.stats[st])}</td>`)}
                   ${showCurrent ? html`<td>${this._fmt(this._current(s))}</td>` : nothing}
                 </tr>
               `
@@ -278,8 +354,10 @@ export class TimeseriesCard extends BasePrometheusCard<TimeseriesCardConfig> {
   }
 
   private _renderLegend() {
-    const stats = (this._config.legend_values || []) as LegendStat[];
-    if (this._config.legend_mode === 'table') return this._renderLegendTable(stats);
+    // statistics columns exist only in the table legend
+    if (this._config.legend_mode === 'table') {
+      return this._renderLegendTable((this._config.legend_values || []) as LegendStat[]);
+    }
     return html`
       <div class="legend">
         ${this._data.series.map(
@@ -291,12 +369,6 @@ export class TimeseriesCard extends BasePrometheusCard<TimeseriesCardConfig> {
             >
               <div class="legend-color" style="background-color: ${s.color}"></div>
               <span class="legend-name">${s.label}</span>
-              ${stats.map(
-                (st) => html`<span class="legend-value"
-                  ><span class="legend-stat">${localize(`legend_value_${st}`, this._hass)}:</span>
-                  ${this._fmt(s.stats[st])}</span
-                >`
-              )}
               ${this._showCurrent() ? html`<span class="legend-value">${this._fmt(this._current(s))}</span>` : nothing}
             </div>
           `

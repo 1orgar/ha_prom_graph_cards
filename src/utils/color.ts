@@ -55,6 +55,11 @@ export function paletteColor(index: number, total: number, palette: PaletteName 
   return scheme[Math.round(pos)];
 }
 
+/** Colour of a threshold / mapping; `transparent: true` wins over the colour. */
+export function stepColor(t: { color?: string; transparent?: boolean }): string | undefined {
+  return t.transparent ? 'transparent' : resolveColor(t.color);
+}
+
 export function getThresholdColor(value: number, thresholds: ThresholdConfig[], fallback?: string): string {
   if (!thresholds || thresholds.length === 0) {
     return fallback || GRAFANA_CLASSIC[0];
@@ -62,10 +67,10 @@ export function getThresholdColor(value: number, thresholds: ThresholdConfig[], 
   const sorted = [...thresholds].sort((a, b) => b.value - a.value);
   for (const t of sorted) {
     if (value >= t.value) {
-      return resolveColor(t.color)!;
+      return stepColor(t) || fallback || GRAFANA_CLASSIC[0];
     }
   }
-  return resolveColor(sorted[sorted.length - 1].color) || fallback || GRAFANA_CLASSIC[0];
+  return stepColor(sorted[sorted.length - 1]) || fallback || GRAFANA_CLASSIC[0];
 }
 
 /** `#rrggbb` + alpha -> `#rrggbbaa` (other formats returned unchanged). */

@@ -1,7 +1,15 @@
 import { colorPosition, HeatmapModel, schemeColor } from './heatmap-data';
+import { timeLabel } from '../../utils/time';
 
-export const LABEL_W = 90;
 export const AXIS_H = 16;
+const FONT = '10px sans-serif';
+const MAX_LABEL_W = 110;
+
+/** Width of the row label column: longest label (short `le` values -> narrow column). */
+export function labelWidth(rows: string[], measure: (s: string) => number = (s) => s.length * 6): number {
+  const longest = rows.reduce((m, r) => Math.max(m, measure(r)), 0);
+  return Math.min(MAX_LABEL_W, Math.ceil(longest) + 8);
+}
 
 export interface DrawOptions {
   height: number;
@@ -17,12 +25,15 @@ export function drawHeatmap(canvas: HTMLCanvasElement, m: HeatmapModel, o: DrawO
   const dpr = window.devicePixelRatio || 1;
   canvas.width = width * dpr;
   canvas.height = o.height * dpr;
-  canvas.style.height = `${o.height}px`;
+  if (!canvas.parentElement?.classList.contains('fill')) canvas.style.height = `${o.height}px`;
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
   ctx.scale(dpr, dpr);
   ctx.clearRect(0, 0, width, o.height);
 
+  ctx.font = FONT;
+  const LABEL_W = labelWidth(m.rows, (t) => ctx.measureText(t).width);
+  (canvas as any).__labelW = LABEL_W;
   const plotW = width - LABEL_W;
   const plotH = o.height - AXIS_H;
   const cw = plotW / m.times.length;
@@ -38,20 +49,21 @@ export function drawHeatmap(canvas: HTMLCanvasElement, m: HeatmapModel, o: DrawO
   });
 
   ctx.fillStyle = o.textColor;
-  ctx.font = '10px sans-serif';
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
   const every = Math.max(1, Math.ceil(12 / ch));
   m.rows.forEach((label, r) => {
     if (r % every) return;
-    ctx.fillText(label.length > 14 ? `${label.slice(0, 13)}…` : label, 0, plotH - (r + 0.5) * ch);
+    let text = label;
+    while (text.length > 2 && ctx.measureText(text).width > LABEL_W - 8) text = text.slice(0, -2) + '…';
+    ctx.fillText(text, 0, plotH - (r + 0.5) * ch);
   });
 
   ctx.textBaseline = 'top';
   const ticks = Math.min(5, m.times.length);
   for (let i = 0; i < ticks; i++) {
     const idx = ticks > 1 ? Math.round((i / (ticks - 1)) * (m.times.length - 1)) : 0;
-    const label = new Date(m.times[idx] * 1000).toLocaleTimeString(o.language, { hour: '2-digit', minute: '2-digit' });
+    const label = timeLabel(m.times[idx], m.times[m.times.length - 1] - m.times[0], o.language);
     ctx.textAlign = i === 0 ? 'left' : i === ticks - 1 ? 'right' : 'center';
     ctx.fillText(label, LABEL_W + idx * cw, plotH + 3);
   }
@@ -63,7 +75,8 @@ export function hitTest(
   rect: { width: number; left: number; top: number },
   clientX: number,
   clientY: number,
-  height: number
+  height: number,
+  LABEL_W = labelWidth(m.rows)
 ): [number, number] | null {
   const x = clientX - rect.left - LABEL_W;
   const y = clientY - rect.top;

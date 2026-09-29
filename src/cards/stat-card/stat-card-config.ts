@@ -18,5 +18,5 @@ export interface StatCardConfig extends BaseCardConfig {
   layout?: 'default' | 'tiles';
   tile_style?: 'gradient' | 'solid';  // tile background, default gradient
   tile_min_width?: number;            // px, default 140
-  tile_height?: number;               // px, default 110
+  tile_height?: number;               // px; empty = auto (fills the panel / 90px min)
 }

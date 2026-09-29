@@ -1,16 +1,11 @@
 import { css } from 'lit';
 
 export const statStyles = css`
-  ha-card {
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
   .stat-container {
     display: flex;
     align-items: center;
     gap: 16px;
+    flex-shrink: 0;
   }
   .icon-container {
     display: flex;
@@ -24,21 +19,14 @@ export const statStyles = css`
     background-color: color-mix(in srgb, var(--icon-color, var(--primary-color)) 20%, transparent);
     color: var(--icon-color, var(--primary-color));
   }
-  .info-container {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    min-width: 0;
-  }
-  .name {
-    font-size: 14px;
-    color: var(--secondary-text-color);
-    font-weight: 500;
-  }
   .value-container {
     display: flex;
     align-items: baseline;
     gap: 2px;
+  }
+  /* fixed-height panel without sparkline: value centred vertically */
+  .stat-container.fill {
+    flex: 1 1 auto;
   }
   .value {
     font-size: 36px;
@@ -85,21 +73,20 @@ export const statStyles = css`
   }
 
   /* ---- tiles layout (Grafana "background gradient") ---- */
-  .card-title {
-    font-size: 14px;
-    color: var(--secondary-text-color);
-    font-weight: 500;
-  }
   .tiles {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(var(--tile-min, 140px), 1fr));
     gap: 8px;
   }
+  /* auto tile height: fill the panel rows equally */
+  .tiles.auto.fill {
+    grid-auto-rows: 1fr;
+  }
   .tile {
     position: relative;
     overflow: hidden;
     border-radius: calc(var(--ha-card-border-radius, 12px) - 4px);
-    min-height: var(--tile-height, 110px);
+    min-height: var(--tile-height, 90px);
     padding: 10px 12px;
     box-sizing: border-box;
     display: flex;

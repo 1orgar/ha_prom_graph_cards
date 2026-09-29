@@ -37,10 +37,15 @@ export function parseInstant(res: PrometheusResponse | null | undefined, legend?
   }));
 }
 
-/** Range query -> one entry per returned series. */
-export function parseRange(res: PrometheusResponse | null | undefined, legend?: string, fallback?: string): RangeSeries[] {
+/** Range query -> one entry per returned series (`limit` = max series, default MAX_SERIES). */
+export function parseRange(
+  res: PrometheusResponse | null | undefined,
+  legend?: string,
+  fallback?: string,
+  limit = MAX_SERIES
+): RangeSeries[] {
   const result = res?.data?.result || [];
-  return result.slice(0, MAX_SERIES).map((r) => ({
+  return result.slice(0, limit).map((r) => ({
     metric: r.metric || {},
     label: formatLegend(r.metric || {}, legend, fallback),
     points: (r.values || []).map(([t, v]) => [Number(t), num(v)] as [number, number | null])

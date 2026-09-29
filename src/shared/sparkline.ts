@@ -25,6 +25,9 @@ export class Sparkline extends LitElement {
     :host {
       display: block;
     }
+    :host(.fill) {
+      min-height: 24px;
+    }
     svg {
       display: block;
       overflow: visible;
@@ -80,8 +83,8 @@ export class Sparkline extends LitElement {
       `;
     });
 
-    return html`
-      <svg viewBox="0 0 100 100" preserveAspectRatio="none" style="height: ${this.height}px">${paths}</svg>
-    `;
+    // `fill` class on the host (fixed-height panel): stretch to the host height
+    const style = this.classList.contains('fill') ? 'height: 100%' : `height: ${this.height}px`;
+    return html`<svg viewBox="0 0 100 100" preserveAspectRatio="none" style=${style}>${paths}</svg>`;
   }
 }

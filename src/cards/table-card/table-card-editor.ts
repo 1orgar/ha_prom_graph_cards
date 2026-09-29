@@ -1,8 +1,7 @@
-import { html } from 'lit';
 import { customElement } from 'lit/decorators.js';
 import type { TableCardConfig } from './table-card';
 import { BasePrometheusEditor, EditorSection } from '../../shared/base-editor';
-import { advancedSection, DECIMALS_SCHEMA, ENTRY_SCHEMA, QUERY_SCHEMA, UNIT_SCHEMA } from '../../shared/editor-utils';
+import { DECIMALS_SCHEMA, displaySection, panelSection, querySection, UNIT_SCHEMA } from '../../shared/editor-utils';
 import { localize } from '../../localize';
 
 @customElement('prometheus-table-card-editor')
@@ -16,39 +15,24 @@ export class TableCardEditor extends BasePrometheusEditor<TableCardConfig> {
   }
 
   protected _sections(): EditorSection[] {
+    const q = querySection({ legend: false });
+    // columns come from the labels of the query result -> part of the query block
+    q.schema.push(
+      { name: 'columns', selector: { text: { multiple: true } } },
+      { name: 'hide_columns', selector: { text: { multiple: true } } }
+    );
     return [
-      {
-        schema: [
-          ENTRY_SCHEMA,
-          QUERY_SCHEMA,
-          { name: 'columns', selector: { text: { multiple: true } } },
-          { name: 'hide_columns', selector: { text: { multiple: true } } }
-        ]
-      },
-      {
-        title: 'section_display',
-        schema: [
-          { name: 'name', selector: { text: {} } },
-          {
-            name: '',
-            type: 'grid',
-            schema: [
-              { name: 'value_column', selector: { text: {} } },
-              UNIT_SCHEMA,
-              DECIMALS_SCHEMA,
-              { name: 'max_rows', selector: { number: { min: 1, max: 1000, mode: 'box' } } },
-              { name: 'sort_by', selector: { select: { mode: 'dropdown', options: this._options('sort_by_', ['value', 'label']) } } },
-              { name: 'sort_dir', selector: { select: { mode: 'dropdown', options: this._options('sort_dir_', ['desc', 'asc']) } } },
-              { name: 'color_cells', selector: { boolean: {} } }
-            ]
-          }
-        ]
-      },
-      advancedSection()
+      panelSection(),
+      q,
+      displaySection(
+        UNIT_SCHEMA,
+        DECIMALS_SCHEMA,
+        { name: 'value_column', selector: { text: {} } },
+        { name: 'max_rows', selector: { number: { min: 1, max: 1000, mode: 'box' } } },
+        { name: 'sort_by', selector: { select: { mode: 'dropdown', options: this._options('sort_by_', ['value', 'label']) } } },
+        { name: 'sort_dir', selector: { select: { mode: 'dropdown', options: this._options('sort_dir_', ['desc', 'asc']) } } },
+        { name: 'color_cells', selector: { boolean: {} } }
+      )
     ];
-  }
-
-  protected _renderExtra() {
-    return html`${this._renderThresholds()}`;
   }
 }

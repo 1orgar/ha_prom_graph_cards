@@ -3,6 +3,7 @@ import { property, state } from 'lit/decorators.js';
 import { BaseCardConfig, HaFormSchema, HomeAssistant } from '../types';
 import { localize } from '../localize';
 import { cleanConfig, editorStyles, fireConfigChanged, loadHaComponents } from './editor-utils';
+import { migrateConfig } from '../utils/migrate';
 import './list-editor';
 import './query-editor';
 
@@ -12,10 +13,17 @@ const THRESHOLD_SCHEMA: HaFormSchema[] = [
     type: 'grid',
     schema: [
       { name: 'value', required: true, selector: { number: { mode: 'box', step: 'any' } } },
-      { name: 'color', required: true, selector: { text: { type: 'color' } } }
+      { name: 'color', selector: { text: { type: 'color' } } },
+      { name: 'transparent_color', selector: { boolean: {} } }
     ]
   }
 ];
+
+/** `transparent` of a threshold is shown as "transparent_color" (label differs from the card option). */
+const toForm = (items: Record<string, unknown>[] = []) =>
+  items.map(({ transparent, ...rest }) => (transparent ? { ...rest, transparent_color: true } : rest));
+const fromForm = (items: Record<string, unknown>[]) =>
+  items.map(({ transparent_color, ...rest }) => (transparent_color ? { ...rest, transparent: true } : rest));
 
 export interface EditorSection {
   title?: string;
@@ -35,7 +43,8 @@ export abstract class BasePrometheusEditor<C extends BaseCardConfig> extends Lit
   static styles = editorStyles;
 
   public setConfig(config: C): void {
-    this._config = config;
+    // old configs (`name`, several `series`) are shown and saved in the v0.6 form
+    this._config = migrateConfig(config);
   }
 
   connectedCallback(): void {
@@ -58,7 +67,12 @@ export abstract class BasePrometheusEditor<C extends BaseCardConfig> extends Lit
     return nothing;
   }
 
-  /** Shared list editor for `thresholds` (stat, gauge, bar cards). */
+  /** Block 4 "Thresholds" (cards without thresholds return false). */
+  protected _hasThresholds(): boolean {
+    return true;
+  }
+
+  /** Shared list editor for `thresholds`. */
   protected _renderThresholds(): TemplateResult {
     const config = this._config as unknown as { thresholds?: Record<string, unknown>[] };
     return html`
@@ -66,13 +80,13 @@ export abstract class BasePrometheusEditor<C extends BaseCardConfig> extends Lit
       <div class="helper">${localize('helper_thresholds', this.hass)}</div>
       <prometheus-list-editor
         .hass=${this.hass}
-        .items=${config.thresholds || []}
+        .items=${toForm(config.thresholds)}
         .schema=${THRESHOLD_SCHEMA}
         .newItem=${() => ({ value: 0, color: '#73BF69' })}
         .addLabel=${localize('add_threshold', this.hass)}
         @value-changed=${(ev: CustomEvent) => {
           ev.stopPropagation();
-          const items = ev.detail.value as Record<string, unknown>[];
+          const items = fromForm(ev.detail.value as Record<string, unknown>[]);
           this._updateConfig({ thresholds: items.length ? items : undefined } as unknown as Partial<C>);
         }}
       ></prometheus-list-editor>
@@ -190,6 +204,7 @@ export abstract class BasePrometheusEditor<C extends BaseCardConfig> extends Lit
           `
         )}
         ${this._renderExtra()}
+        ${this._hasThresholds() ? this._renderThresholds() : nothing}
       </div>
     `;
   }

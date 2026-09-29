@@ -1,32 +1,17 @@
 import { css } from 'lit';
 
 export const timeseriesStyles = css`
-  :host {
-    display: block;
-  }
-  ha-card {
-    padding: 0;
-  }
-  .header {
-    padding: 16px 16px 0;
-    font-size: 1.2rem;
-    font-weight: 500;
-    color: var(--primary-text-color);
-  }
   .chart-container {
     width: 100%;
     position: relative;
-    padding: 12px 8px 0;
     box-sizing: border-box;
-  }
-  .overlay {
-    padding: 0 16px 16px;
+    overflow: hidden;
   }
   .legend {
     display: flex;
     flex-wrap: wrap;
+    flex-shrink: 0;
     gap: 4px 16px;
-    padding: 8px 16px 16px;
     font-size: 12px;
     max-height: var(--legend-max-height, 160px);
     overflow-y: auto;
@@ -65,7 +50,7 @@ export const timeseriesStyles = css`
     color: var(--secondary-text-color);
   }
   .legend-table-wrap {
-    padding: 4px 16px 12px;
+    flex-shrink: 0;
     max-height: var(--legend-max-height, 200px);
     overflow: auto;
   }

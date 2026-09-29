@@ -1,6 +1,6 @@
 import { ThresholdConfig, ValueMapping, PaletteOption } from '../types';
 import { formatValue } from './format';
-import { getThresholdColor, resolveColor } from './color';
+import { getThresholdColor, stepColor } from './color';
 import { itemColor } from './series';
 
 export interface MappedState {
@@ -35,7 +35,7 @@ export function mapValue(
       return {
         key: `m${i}`,
         text: m.text || text,
-        color: resolveColor(m.color) || itemColor(i, (opts.mappings || []).length, opts.palette)
+        color: stepColor(m) || itemColor(i, (opts.mappings || []).length, opts.palette)
       };
     }
   }

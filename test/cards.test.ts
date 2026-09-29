@@ -48,7 +48,7 @@ describe('bar gauge / mappings / pie', () => {
 
   it('pie: top N + Other, skips non-positive', () => {
     const res = vector([[{ job: 'a' }, 50], [{ job: 'b' }, 30], [{ job: 'c' }, 20], [{ job: 'd' }, -1]]);
-    const slices = buildSlices([res], [{ query: 'q', name: '{{job}}' }], { limit: 2, otherLabel: 'Other' });
+    const slices = buildSlices(res, '{{job}}', { limit: 2, otherLabel: 'Other' });
     expect(slices.map((s) => [s.label, s.value, Math.round(s.percent)])).toEqual([
       ['a', 50, 50],
       ['b', 30, 30],

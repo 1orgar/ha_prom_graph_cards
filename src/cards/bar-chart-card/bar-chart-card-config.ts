@@ -2,8 +2,6 @@ import { BaseCardConfig, ThresholdConfig } from '../../types';
 
 export interface BarChartCardConfig extends BaseCardConfig {
   type: 'custom:prometheus-bar-card';
-  /** Extra queries; each may return several series. `query` is kept for v0.2 configs */
-  series?: { query: string; name?: string; color?: string }[];
   orientation?: 'horizontal' | 'vertical';  // default 'horizontal'
   max?: number;             // max value for bar scale
   thresholds?: ThresholdConfig[];
@@ -11,5 +9,10 @@ export interface BarChartCardConfig extends BaseCardConfig {
   sort?: 'desc' | 'asc' | 'name' | 'none';
   limit?: number;           // show at most N bars
   show_values?: boolean;    // show value labels, default true
-  bar_height?: number;      // height of each bar in px for horizontal, default 24
+  /** px; empty = auto (bars share the panel height, 24px when the panel height is auto) */
+  bar_height?: number;
+  /** transparent background of the unfilled part of every bar, default false */
+  transparent_track?: boolean;
+  /** with a transparent track: value right after the end of the bar instead of a column */
+  value_at_end?: boolean;
 }

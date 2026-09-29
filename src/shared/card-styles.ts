@@ -1,16 +1,55 @@
 import { css, CSSResultGroup } from 'lit';
 
 export const cardStyles: CSSResultGroup = css`
+  :host {
+    display: block;
+  }
+  /* Every panel: same padding, fills the height given by the layout / card_height */
   ha-card {
     border-radius: var(--ha-card-border-radius, 12px);
     overflow: hidden;
     padding: 16px;
-    /* --ha-card-background is overridden by the grid card ("transparent inner cards") */
+    gap: 8px;
+    height: 100%;
     background: var(--ha-card-background, var(--card-background-color, var(--paper-card-background-color, white)));
     box-shadow: var(--ha-card-box-shadow, 0px 2px 1px -1px rgba(0, 0, 0, 0.2), 0px 1px 1px 0px rgba(0, 0, 0, 0.14), 0px 1px 3px 0px rgba(0, 0, 0, 0.12));
     display: flex;
     flex-direction: column;
     box-sizing: border-box;
+  }
+
+  /* Panel title: identical on every card, so panels in one row line up */
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    height: 24px;
+    margin: 0;
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 24px;
+    color: var(--primary-text-color);
+  }
+  .card-header .card-title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .card-header .card-extra {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--secondary-text-color);
+    white-space: nowrap;
+  }
+
+  /* Content area that takes the remaining panel height */
+  .fill {
+    flex: 1 1 auto;
+    min-height: 0;
+    position: relative;
   }
 
   /* "Transparent background" option: no plate, no shadow, no border */
@@ -20,13 +59,6 @@ export const cardStyles: CSSResultGroup = css`
     border: none;
     --ha-card-border-width: 0;
     backdrop-filter: none;
-  }
-
-  .card-header {
-    font-weight: 500;
-    font-size: 14px;
-    color: var(--secondary-text-color);
-    margin-bottom: 8px;
   }
 
   .card-content {

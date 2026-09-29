@@ -15,7 +15,7 @@ Grafana-style dashboard cards for Home Assistant, powered by PromQL.
 > **Requires the backend integration** [Prometheus Dashboard (`ha_prom_graph`)](https://github.com/1orgar/ha_prom_graph).
 > The cards never talk to Prometheus directly — all queries go through the HA websocket API.
 
-![Grid card](https://raw.githubusercontent.com/1orgar/ha_prom_graph_cards/main/images/grid.png)
+![Row of panels](https://raw.githubusercontent.com/1orgar/ha_prom_graph_cards/main/images/row.png)
 
 ## 🖼️ Screenshots
 
@@ -30,16 +30,18 @@ Grafana-style dashboard cards for Home Assistant, powered by PromQL.
 
 ## ✨ Features
 
-- 📊 **11 cards** — Stat (value or Grafana-like gradient tiles), Gauge, Bar Gauge, Time Series (uPlot), Bar Chart,
-  State Timeline, Pie / Donut, Table, Heatmap, Alerts list and a **Grid** layout card
-- 🧱 **Grid card** — rows with any number of cards and width ratios (`25,25,50`) on one shared background
+- 📊 **10 cards** — Stat (value or Grafana-like gradient tiles), Gauge, Bar Gauge, Time Series (uPlot), Bar Chart,
+  State Timeline, Pie / Donut, Table, Heatmap, Alerts list
+- 🧱 **Same editor layout everywhere** — Panel / Query / Display / Thresholds, one query per panel
+- 📐 **Equal panel heights** — identical titles, `card_height` or the Sections rows; auto height when empty
 - ⌨️ **PromQL editor** — autocomplete for metrics, functions, labels and label values + **Test query** button
 - 📐 **Sections view** support (`getGridOptions`), polling pauses on hidden tabs
 - ♻️ Identical queries of all cards / tabs are merged and cached by the backend
 - 🪟 **Transparent background** option on every card
 - 🧩 **Listed in the card picker** — *Add card → Custom / Community*, with live previews rendered from built-in demo data
-- 🛠️ **Fully visual editor** — every option, thresholds and series are editable in the UI, no YAML needed
+- 🛠️ **Fully visual editor** — every option and threshold is editable in the UI, no YAML needed
 - 🔢 **Multi-series everywhere** — a query returning many series draws many lines / stat rows / gauges / bars
+- 🚨 **Alerts** — Prometheus rules and PromQL alerts of Home Assistant, firing window filter, every series listed
 - 🎨 **Grafana palettes** — classic palette + by-series schemes, Grafana-like legend (`{{label}}` format, table with min/max/mean, click to isolate)
 - 📏 **Grafana units** — pick a unit from a list (bytes IEC/SI, bits/s, s → min → hour, W → kW, %, °C, ₽ …), values are scaled within the dimension
 - 🔌 **Multiple Prometheus servers** — pick a server from a dropdown in the editor
@@ -77,32 +79,48 @@ Everything is configured in the visual editor.
 | Prometheus Table | `custom:prometheus-table-card` |
 | Prometheus Heatmap | `custom:prometheus-heatmap-card` |
 | Prometheus Alerts | `custom:prometheus-alerts-card` |
-| Prometheus Grid | `custom:prometheus-grid-card` |
 
 In any query field press **Ctrl+Space** for suggestions (they also appear while typing) and
 **Test query** to see the number of returned series, sample labels or the PromQL error.
 
+### Editor layout
+
+Every card editor has the same four blocks:
+
+1. **Panel** — title, panel height, transparent background (+ icon for Stat)
+2. **Query** — server, PromQL, legend format, refresh interval, time range / step
+3. **Display** — unit, decimals, palette, sorting, axes, legend … (how the returned series are drawn)
+4. **Thresholds** — value → colour, any threshold can be **transparent**
+
+**One query per panel.** A query may return many series — each gets its own palette colour and legend entry.
+Configs of v0.2–v0.6 with several `series:` are converted automatically (the first query is kept;
+combine several metrics in PromQL, e.g. `a or b`).
+
+### Panel height
+
+All titles look the same on every card. `card_height` (px) fixes the panel height — give the cards of one row
+the same value (or set the rows in the Sections layout editor) and they line up; charts, bars, tiles and the
+heatmap stretch to fill the panel. Empty = **auto** (content height).
+
+![Row of equally high panels](https://raw.githubusercontent.com/1orgar/ha_prom_graph_cards/main/images/row.png)
+
 <details>
 <summary>YAML reference (optional)</summary>
 
-Common options: `entry_id` (server, empty = first configured), `query`, `name`, `refresh_interval` (s, default 30),
+Common options: `entry_id` (server, empty = first configured), `query`, `title`, `card_height` (px, empty = auto),
+`transparent`, `refresh_interval` (s, default 30),
 `unit` (Grafana unit id: `bytes`, `decbytes`, `bps`, `binBps`, `s`, `ms`, `dtdurations`, `percent`, `percentunit`,
 `watt`, `kwatth`, `celsius`, `short`, … or any custom suffix), `decimals` (empty = auto),
-`legend_format` (`{{instance}} {{job}}`), `palette` (`classic`, `green-yellow-red`, `blues`, `greens`, `reds`, `purples`, `single`).
-
-Several series per query: Stat — `reduce: none | sum | avg | min | max`; Gauge — one gauge per series;
-Bar — one bar per series, extra queries in `series:`; Time series — one line per series.
+`legend_format` (`{{instance}} {{job}}`), `palette` (`classic`, `green-yellow-red`, `blues`, `greens`, `reds`, `purples`, `single`),
+`thresholds: [{ value, color, transparent? }]`.
 
 ```yaml
 type: custom:prometheus-stat-card
+title: RAM available
 query: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100
-name: RAM available
 icon: mdi:memory
 unit: percent
-line_width: 2
-decimals: 1
 sparkline: true
-sparkline_hours: 24
 thresholds:
   - { value: 0, color: '#F44336' }
   - { value: 20, color: '#FFC107' }
@@ -111,117 +129,60 @@ thresholds:
 
 ```yaml
 type: custom:prometheus-gauge-card
+title: CPU load (1m)
 query: avg(node_load1)
-name: CPU load (1m)
 min: 0
 max: 8
+show_unfilled: false      # no background arc
 ```
 
 ```yaml
 type: custom:prometheus-timeseries-card
-title: Network traffic
-time_range: 6h
+title: Network
+query: rate(node_network_receive_bytes_total{device!="lo"}[5m])
+legend_format: '{{device}} rx'
 unit: binBps
+time_range: 6h
 fill: true
-fill_opacity: 15
-line_width: 1.5
+show_current: false       # current / hovered value in the legend (default off)
 legend_mode: table
-legend_values: [last, max, mean]
-series:
-  - query: rate(node_network_receive_bytes_total{device!="lo"}[5m])
-    name: '{{device}} rx'
-  - query: rate(node_network_transmit_bytes_total{device!="lo"}[5m])
-    name: '{{device}} tx'
+legend_values: [max, mean] # only in the table legend
+show_x_axis: true          # axis labels can be switched off separately
+show_y_axis: true
+threshold_style: line      # off | line | area
+# min: 0                   # empty = auto, the axis always starts with a labelled value
 ```
 
 ```yaml
 type: custom:prometheus-bar-card
-query: 100 - node_filesystem_avail_bytes / node_filesystem_size_bytes * 100
-name: Disk usage
-legend_format: '{{mountpoint}}'
-unit: percent
-max: 100
-```
-
-
-<details>
-<summary>More examples: stat tiles, state timeline, pie</summary>
-
-```yaml
-# Grafana-like coloured tiles, one per series
-type: custom:prometheus-stat-card
-name: CPU usage
-query: 100 - avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100
+title: Memory used
+query: node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes
 legend_format: '{{instance}}'
-layout: tiles
-tile_style: gradient
-unit: percent
-sparkline: true
-thresholds:
-  - { value: 0, color: '#73BF69' }
-  - { value: 70, color: '#FF9830' }
-  - { value: 90, color: '#F2495C' }
+unit: bytes
+# bar_height: 24           # empty = auto (bars share a fixed panel height)
+transparent_track: true    # no background for the unfilled part
+value_at_end: true         # value right after the bar end (needs transparent_track)
 ```
 
 ```yaml
 type: custom:prometheus-state-timeline-card
 title: Targets
+query: up
+legend_format: '{{job}}'
 time_range: 24h
-series:
-  - query: up
-    name: '{{job}}'
 mappings:
-  - { value: '1', text: UP, color: '#73BF69' }
+  - { value: '1', text: UP, color: '#73BF69', transparent: true }   # hide the normal state
   - { value: '0', text: DOWN, color: '#F2495C' }
 ```
 
 ```yaml
 type: custom:prometheus-pie-card
 title: Disk usage by mount
-series:
-  - query: node_filesystem_size_bytes - node_filesystem_avail_bytes
-    name: '{{mountpoint}}'
+query: node_filesystem_size_bytes - node_filesystem_avail_bytes
+legend_format: '{{mountpoint}}'
 unit: bytes
-pie_type: donut
 legend_values: [value, percent]
 limit: 5
-transparent: true
-```
-
-</details>
-
-</details>
-
-<details>
-<summary>Grid, bar gauge, table, heatmap, alerts</summary>
-
-```yaml
-# 3 cards 25/25/50 in the first row, one full-width chart in the second
-type: custom:prometheus-grid-card
-title: Server
-background: card          # card | transparent | custom (+ background_color)
-inner_transparent: true   # child cards drop their own background
-gap: 8
-rows:
-  - widths: 25,25,50
-    cards:
-      - type: custom:prometheus-stat-card
-        name: Load
-        query: node_load1
-      - type: custom:prometheus-stat-card
-        name: Up
-        query: sum(up)
-      - type: custom:prometheus-bar-gauge-card
-        query: 100 - node_filesystem_avail_bytes / node_filesystem_size_bytes * 100
-        legend_format: '{{mountpoint}}'
-        unit: percent
-        max: 100
-  - cards:
-      - type: custom:prometheus-timeseries-card
-        time_range: 6h
-        series:
-          - query: rate(node_cpu_seconds_total{mode!="idle"}[5m])
-            name: '{{mode}}'
 ```
 
 ```yaml
@@ -234,21 +195,26 @@ color_cells: true
 
 ```yaml
 type: custom:prometheus-heatmap-card
+title: Request duration
+# buckets must be rates / increases; raw _bucket counters are converted automatically (counters: auto)
 query: sum by (le) (rate(prometheus_http_request_duration_seconds_bucket[5m]))
-heatmap_mode: histogram   # or "series"
+heatmap_mode: histogram   # rows = le (upper bound), or "series"
 color_scheme: spectral
 time_range: 6h
 ```
 
 ```yaml
 type: custom:prometheus-alerts-card
+title: Alerts
 states: [firing, pending]
+min_active: 5m            # firing window: hide alerts active for less than 5 minutes
+source: ''                # '' = all, prometheus = server rules, local = PromQL alerts of Home Assistant
 severities: critical,warning
 show_labels: true
+group_by_name: false      # default: every series of an alert is its own row
 ```
 
 </details>
-
 
 ## 🔧 Development
 

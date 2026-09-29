@@ -18,9 +18,10 @@ export class BarGaugeCard extends BasePrometheusCard<BarGaugeCardConfig> {
     return [
       cardStyles,
       css`
-        ha-card { padding: 16px; gap: 10px; }
-        .name { font-size: 14px; font-weight: 500; color: var(--secondary-text-color); }
         .list { display: flex; flex-direction: column; gap: 10px; }
+        .list.fill.auto .row { flex: 1 1 0; min-height: 0; }
+        .list.fill.auto .track { flex: 1 1 auto; height: auto; min-height: 4px; max-height: 64px; }
+        .cols.fill { height: auto; }
         .row { display: flex; flex-direction: column; gap: 3px; }
         .row-head { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
         .label { color: var(--secondary-text-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -41,7 +42,7 @@ export class BarGaugeCard extends BasePrometheusCard<BarGaugeCardConfig> {
   static getStubConfig(): Partial<BarGaugeCardConfig> {
     return {
       type: 'custom:prometheus-bar-gauge-card',
-      name: 'Disk usage',
+      title: 'Disk usage',
       query: '100 - node_filesystem_avail_bytes / node_filesystem_size_bytes * 100',
       legend_format: '{{mountpoint}}',
       unit: 'percent',
@@ -59,9 +60,6 @@ export class BarGaugeCard extends BasePrometheusCard<BarGaugeCardConfig> {
     return document.createElement('prometheus-bar-gauge-card-editor');
   }
 
-  public getGridOptions() {
-    return { columns: 6, rows: 'auto' as const, min_columns: 3 };
-  }
 
   protected async _fetchData(): Promise<void> {
     const c = this._config;
@@ -120,9 +118,12 @@ export class BarGaugeCard extends BasePrometheusCard<BarGaugeCardConfig> {
     const vertical = c.orientation === 'vertical';
     return html`
       <ha-card>
-        ${c.name ? html`<div class="name">${c.name}</div>` : nothing}
+        ${this.renderHeader()}
         ${this._items.length
-          ? html`<div class=${vertical ? 'cols' : 'list'} style="--bar-h:${c.bar_height || 18}px">
+          ? html`<div
+              class="${vertical ? 'cols' : 'list'} ${this._fixedHeight() ? 'fill' : ''} ${c.bar_height ? '' : 'auto'}"
+              style=${c.bar_height ? `--bar-h:${c.bar_height}px` : ''}
+            >
               ${this._items.map((it, i) => this._bar(it, i, max, vertical))}
             </div>`
           : html`<div class="placeholder-state">${localize('no_data', this._hass)}</div>`}

@@ -1,4 +1,4 @@
-import { html, nothing } from 'lit';
+import { html, nothing, svg } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { BasePrometheusCard } from '../../shared/base-prometheus-card';
 import { cardStyles } from '../../shared/card-styles';
@@ -25,7 +25,7 @@ export class GaugeCard extends BasePrometheusCard<GaugeCardConfig> {
   static getStubConfig(): Partial<GaugeCardConfig> {
     return {
       type: 'custom:prometheus-gauge-card',
-      name: 'Prometheus targets up',
+      title: 'Prometheus targets up',
       query: 'avg(up) * 100',
       unit: 'percent',
       min: 0,
@@ -80,12 +80,15 @@ export class GaugeCard extends BasePrometheusCard<GaugeCardConfig> {
     const f = formatParts(item.value, c.unit, c.decimals);
     const showLabel = total > 1 && c.show_labels !== false;
 
+    const unfilled = c.show_unfilled !== false;
     return html`
       <div class="gauge">
         <div class="gauge-container">
           <svg viewBox="0 0 100 60" class="gauge-svg">
-            <path class="arc-bg" d="M 10 50 A 40 40 0 0 1 90 50" fill="none"
-              stroke-width="${arcWidth}" stroke-linecap="round"></path>
+            ${unfilled
+              ? svg`<path class="arc-bg" d="M 10 50 A 40 40 0 0 1 90 50" fill="none"
+                  stroke-width="${arcWidth}" stroke-linecap="round"></path>`
+              : nothing}
             <path class="arc-fg" d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="${color}"
               stroke-width="${arcWidth}" stroke-linecap="round"
               stroke-dasharray="${CIRCUMFERENCE}" stroke-dashoffset="${CIRCUMFERENCE * (1 - fraction)}"></path>
@@ -101,7 +104,6 @@ export class GaugeCard extends BasePrometheusCard<GaugeCardConfig> {
   }
 
   render() {
-    const c = this._config;
     if (!this._hasQuery()) return this.renderPlaceholder();
     if (this._error) return this.renderError();
     if (!this._loaded) return this.renderLoading();
@@ -112,21 +114,22 @@ export class GaugeCard extends BasePrometheusCard<GaugeCardConfig> {
 
     return html`
       <ha-card>
-        ${c.name ? html`<div class="name">${c.name}</div>` : nothing}
+        ${this.renderHeader()}
         ${this._loaded && !this._items.length
           ? html`<div class="placeholder-state">${localize('no_data', this._hass)}</div>`
-          : html`<div class="gauges" style=${style}>
+          : html`<div class="gauges ${this._fixedHeight() ? 'fill' : ''}" style=${style}>
               ${items.map((item, i) => this._renderGauge(item, i, items.length))}
             </div>`}
       </ha-card>
     `;
   }
 
-  public getGridOptions() {
-    return { columns: this._items.length > 1 ? 12 : 6, rows: 'auto' as const, min_columns: 3 };
+  protected _defaultColumns(): number {
+    return this._items.length > 1 ? 12 : 6;
   }
 
   public getCardSize(): number {
+    if (this._config?.card_height) return super.getCardSize();
     return this._items.length > 2 ? 5 : 3;
   }
 }

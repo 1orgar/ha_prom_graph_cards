@@ -1,10 +1,11 @@
-import { LitElement, html, TemplateResult, PropertyValues } from 'lit';
+import { LitElement, html, nothing, TemplateResult, PropertyValues } from 'lit';
 import { state } from 'lit/decorators.js';
 import { HomeAssistant, BaseCardConfig } from '../types';
 import { PrometheusClient } from '../prometheus-client';
 import { cardStyles } from './card-styles';
 import { localize } from '../localize';
 import { isDemoContext } from '../demo/demo-data';
+import { migrateConfig, rowsForHeight } from '../utils/migrate';
 
 const DEFAULT_REFRESH_INTERVAL = 30;
 
@@ -25,9 +26,14 @@ export abstract class BasePrometheusCard<C extends BaseCardConfig = BaseCardConf
     if (!config || !config.type) {
       throw new Error('Invalid configuration');
     }
-    this._config = config;
+    this._config = migrateConfig(config);
     this._error = undefined;
     this.toggleAttribute('transparent', Boolean(config.transparent));
+    // Fixed panel height: cards of one row can be given exactly the same height.
+    // Empty = auto (content height, or the height given by the Sections layout).
+    const h = Number(this._config.card_height);
+    this.style.height = h > 0 ? `${h}px` : '';
+    this.toggleAttribute('fixed-height', this._fixedHeight());
     this._restart();
   }
 
@@ -66,9 +72,37 @@ export abstract class BasePrometheusCard<C extends BaseCardConfig = BaseCardConf
     }
   };
 
-  /** Sizes for the "Sections" dashboard view (12-column grid). Overridden per card. */
+  /** Default width (of 12 columns) in the "Sections" dashboard view. */
+  protected _defaultColumns(): number {
+    return 6;
+  }
+
+  /** Sizes for the "Sections" view: rows follow `card_height`, otherwise auto. */
   public getGridOptions(): { columns?: number | 'full'; rows?: number | 'auto'; min_columns?: number; min_rows?: number } {
-    return { columns: 6, rows: 'auto', min_columns: 3 };
+    const h = Number(this._config?.card_height);
+    return { columns: this._defaultColumns(), rows: h > 0 ? rowsForHeight(h) : 'auto', min_columns: 3 };
+  }
+
+  /**
+   * The panel height is given from outside (`card_height`, or rows set in the Sections layout
+   * editor): charts then stretch to fill the panel instead of using their own default height.
+   */
+  protected _fixedHeight(): boolean {
+    const c = this._config as BaseCardConfig & { grid_options?: { rows?: unknown } };
+    return Number(c?.card_height) > 0 || typeof c?.grid_options?.rows === 'number';
+  }
+
+  /** Title of the panel. */
+  protected get _title(): string {
+    return (this._config?.title || '').trim();
+  }
+
+  /** Panel header: identical font / size / padding on every card. */
+  protected renderHeader(extra: TemplateResult | typeof nothing = nothing): TemplateResult | typeof nothing {
+    if (!this._title && extra === nothing) return nothing;
+    return html`<div class="card-header">
+      <span class="card-title" title=${this._title}>${this._title}</span>${extra}
+    </div>`;
   }
 
   /** Whether the config contains enough info to query Prometheus. */
@@ -148,30 +182,23 @@ export abstract class BasePrometheusCard<C extends BaseCardConfig = BaseCardConf
   }
 
   public getCardSize(): number {
-    return 3;
+    const h = Number(this._config?.card_height);
+    return h > 0 ? Math.ceil(h / 50) : 3;
   }
 
   protected renderError(): TemplateResult {
-    return html`
-      <ha-card>
-        <div class="error-state">${this._error}</div>
-      </ha-card>
-    `;
+    return html`<ha-card>${this.renderHeader()}<div class="error-state">${this._error}</div></ha-card>`;
   }
 
   protected renderLoading(): TemplateResult {
-    return html`
-      <ha-card>
-        <div class="loading-state"></div>
-      </ha-card>
-    `;
+    return html`<ha-card>${this.renderHeader()}<div class="loading-state"></div></ha-card>`;
   }
 
   protected renderPlaceholder(key = 'no_query'): TemplateResult {
-    return html`
-      <ha-card>
-        <div class="placeholder-state">${localize(key, this._hass)}</div>
-      </ha-card>
-    `;
+    return html`<ha-card>
+      ${this.renderHeader()}
+      <div class="placeholder-state">${localize(key, this._hass)}</div>
+    </ha-card>`;
   }
 }
+

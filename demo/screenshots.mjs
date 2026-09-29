@@ -49,5 +49,14 @@ await page.waitForTimeout(900);
 await page.screenshot({ path: join(root, 'images', 'card-picker.png'), fullPage: true });
 console.log('saved images/card-picker.png');
 
+// Editors (structure check, not committed): EDITORS=1 node demo/screenshots.mjs
+if (process.env.EDITORS) {
+  await page.setViewportSize({ width: 1000, height: 900 });
+  await page.goto(`http://127.0.0.1:${port}/demo/editor.html?lang=${process.env.EDITORS_LANG || 'en'}`);
+  await page.waitForFunction(() => window.__demoReady === true);
+  await page.screenshot({ path: '/tmp/editors.png', fullPage: true });
+  console.log('saved /tmp/editors.png');
+}
+
 await browser.close();
 server.close();

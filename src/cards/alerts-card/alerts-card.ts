@@ -4,7 +4,7 @@ import { BasePrometheusCard } from '../../shared/base-prometheus-card';
 import { cardStyles } from '../../shared/card-styles';
 import { BaseCardConfig } from '../../types';
 import type { PrometheusAlert } from '../../prometheus-client';
-import { AlertFilter, filterAlerts, severityColor, since } from './alerts-data';
+import { AlertFilter, filterAlerts, groupAlerts, severityColor, since } from './alerts-data';
 import { localize } from '../../localize';
 import './alerts-card-editor';
 
@@ -13,6 +13,8 @@ export interface AlertsCardConfig extends BaseCardConfig, AlertFilter {
   show_labels?: boolean;
   show_annotations?: boolean;
   max_rows?: number;
+  /** one row per alert name with the number of series (default: every series is a row) */
+  group_by_name?: boolean;
 }
 
 const HIDDEN_LABELS = new Set(['alertname', 'severity']);
@@ -26,11 +28,9 @@ export class AlertsCard extends BasePrometheusCard<AlertsCardConfig> {
     return [
       cardStyles,
       css`
-        ha-card { padding: 12px 16px; gap: 8px; }
-        .head { display: flex; justify-content: space-between; align-items: center; }
-        .name { font-size: 14px; font-weight: 500; color: var(--secondary-text-color); }
-        .count { font-size: 12px; color: var(--secondary-text-color); }
-        .list { display: flex; flex-direction: column; gap: 6px; }
+        .list { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; }
+        .list.fill { min-height: 0; }
+        .series-count { font-size: 11px; color: var(--secondary-text-color); white-space: nowrap; }
         .alert { display: flex; gap: 10px; padding: 8px 10px; border-radius: 8px;
           background: var(--secondary-background-color, rgba(127, 127, 127, 0.08)); border-left: 4px solid var(--sev); }
         .alert.pending { opacity: 0.75; border-left-style: dashed; }
@@ -48,16 +48,13 @@ export class AlertsCard extends BasePrometheusCard<AlertsCardConfig> {
   }
 
   static getStubConfig(): Partial<AlertsCardConfig> {
-    return { type: 'custom:prometheus-alerts-card', name: 'Alerts', show_annotations: true };
+    return { type: 'custom:prometheus-alerts-card', title: 'Alerts', show_annotations: true };
   }
 
   static getConfigElement() {
     return document.createElement('prometheus-alerts-card-editor');
   }
 
-  public getGridOptions() {
-    return { columns: 6, rows: 'auto' as const, min_columns: 4 };
-  }
 
   /** No query needed: always fetch. */
   protected _hasQuery(): boolean {
@@ -77,7 +74,7 @@ export class AlertsCard extends BasePrometheusCard<AlertsCardConfig> {
     }
   }
 
-  private _renderAlert(a: PrometheusAlert) {
+  private _renderAlert(a: PrometheusAlert, count = 1, showLabels = false) {
     const c = this._config;
     const sev = a.labels.severity;
     const summary = a.annotations?.summary || a.annotations?.description;
@@ -88,12 +85,13 @@ export class AlertsCard extends BasePrometheusCard<AlertsCardConfig> {
           <div class="title">
             <span class="alertname" title=${a.labels.alertname}>${a.labels.alertname}</span>
             ${sev ? html`<span class="badge">${sev}</span>` : nothing}
+            ${count > 1 ? html`<span class="series-count">× ${count}</span>` : nothing}
             <span class="time" title=${a.activeAt || ''}>
               ${a.state === 'pending' ? `${localize('state_pending', this._hass)} · ` : ''}${since(a.activeAt)}
             </span>
           </div>
           ${c.show_annotations !== false && summary ? html`<div class="summary">${summary}</div>` : nothing}
-          ${c.show_labels && labels.length
+          ${(c.show_labels || showLabels) && count === 1 && labels.length
             ? html`<div class="labels">${labels.map(([k, v]) => html`<span class="label">${k}=${v}</span>`)}</div>`
             : nothing}
         </div>
@@ -105,17 +103,22 @@ export class AlertsCard extends BasePrometheusCard<AlertsCardConfig> {
     const c = this._config;
     if (this._error) return this.renderError();
     if (!this._loaded) return this.renderLoading();
-    let list = filterAlerts(this._alerts, c);
-    const total = list.length;
-    if (c.max_rows) list = list.slice(0, c.max_rows);
+    const filtered = filterAlerts(this._alerts, c);
+    // every series of an alert is a row; optionally collapsed to one row per alert name
+    let rows = c.group_by_name ? groupAlerts(filtered) : filtered.map((alert) => ({ alert, count: 1 }));
+    const total = filtered.length;
+    if (c.max_rows) rows = rows.slice(0, c.max_rows);
+    // several series of one alert: always show their labels so the rows can be told apart
+    const perName = new Map<string, number>();
+    filtered.forEach((a) => perName.set(a.labels.alertname, (perName.get(a.labels.alertname) || 0) + 1));
+    const count = total ? html`<span class="card-extra">${total}</span>` : nothing;
     return html`
       <ha-card>
-        <div class="head">
-          ${c.name ? html`<div class="name">${c.name}</div>` : html`<span></span>`}
-          ${total ? html`<span class="count">${total}</span>` : nothing}
-        </div>
-        ${list.length
-          ? html`<div class="list">${list.map((a) => this._renderAlert(a))}</div>`
+        ${this.renderHeader(count)}
+        ${rows.length
+          ? html`<div class="list ${this._fixedHeight() ? 'fill' : ''}">
+              ${rows.map((r) => this._renderAlert(r.alert, r.count, (perName.get(r.alert.labels.alertname) || 0) > 1))}
+            </div>`
           : html`<div class="ok"><ha-icon icon="mdi:check-circle"></ha-icon>${localize('no_alerts', this._hass)}</div>`}
       </ha-card>
     `;

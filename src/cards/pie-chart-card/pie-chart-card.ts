@@ -23,7 +23,8 @@ export class PieChartCard extends BasePrometheusCard<PieChartCardConfig> {
     return {
       type: 'custom:prometheus-pie-card',
       title: 'Series by job',
-      series: [{ query: 'count by (job) (up)', name: '{{job}}' }],
+      query: 'count by (job) (up)',
+      legend_format: '{{job}}',
       pie_type: 'donut'
     };
   }
@@ -32,15 +33,8 @@ export class PieChartCard extends BasePrometheusCard<PieChartCardConfig> {
     return document.createElement('prometheus-pie-card-editor');
   }
 
-  public setConfig(config: PieChartCardConfig): void {
-    super.setConfig({ ...config, series: Array.isArray(config.series) ? config.series : [] });
-  }
-
-  protected _hasQuery(): boolean {
-    return Boolean(this._config?.series?.some((s) => s?.query?.trim()));
-  }
-
   public getCardSize(): number {
+    if (this._config?.card_height) return super.getCardSize();
     return 4;
   }
 
@@ -48,9 +42,8 @@ export class PieChartCard extends BasePrometheusCard<PieChartCardConfig> {
     const c = this._config;
     try {
       this._loading = true;
-      const queries = c.series.filter((s) => s?.query?.trim());
-      const responses = await Promise.all(queries.map((q) => this._client.instantQuery(q.query)));
-      this._slices = buildSlices(responses, queries, {
+      const res = await this._client.instantQuery(c.query!);
+      this._slices = buildSlices(res, c.legend_format, {
         palette: c.palette,
         sort: c.sort,
         limit: c.limit,
@@ -131,15 +124,18 @@ export class PieChartCard extends BasePrometheusCard<PieChartCardConfig> {
 
   protected render() {
     const c = this._config;
-    if (!this._hasQuery()) return this.renderPlaceholder('no_series');
+    if (!this._hasQuery()) return this.renderPlaceholder();
     if (this._error) return this.renderError();
     if (!this._loaded) return this.renderLoading();
 
     return html`
       <ha-card>
-        ${c.title ? html`<div class="header">${c.title}</div>` : nothing}
+        ${this.renderHeader()}
         ${this._slices.length
-          ? html`<div class="body ${c.legend_position === 'bottom' ? 'bottom' : ''}" style="--pie-size: ${c.size || 180}px">
+          ? html`<div
+              class="body ${c.legend_position === 'bottom' ? 'bottom' : ''} ${this._fixedHeight() ? 'fill' : ''}"
+              style="--pie-size: ${c.size || 180}px"
+            >
               ${this._renderChart()} ${c.show_legend !== false ? this._renderLegend() : nothing}
             </div>`
           : html`<div class="placeholder-state">${localize('no_data', this._hass)}</div>`}

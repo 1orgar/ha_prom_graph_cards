@@ -1,4 +1,4 @@
-import { PrometheusResponse, SeriesConfig, PaletteOption } from '../../types';
+import { PrometheusResponse, PaletteOption } from '../../types';
 import { itemColor, parseInstant } from '../../utils/series';
 import { shortLabel } from '../../utils/format';
 
@@ -9,25 +9,19 @@ export interface Slice {
   percent: number;
 }
 
+/** Instant result -> slices (one per series), top N + "Other". */
 export function buildSlices(
-  responses: (PrometheusResponse | null)[],
-  queries: SeriesConfig[],
+  res: PrometheusResponse | null,
+  legend: string | undefined,
   opts: { palette?: PaletteOption; sort?: 'desc' | 'asc' | 'none'; limit?: number; otherLabel: string }
 ): Slice[] {
+  const template = legend?.trim() || undefined;
   let items: { label: string; value: number; explicit?: string }[] = [];
-  responses.forEach((res, qi) => {
-    const q = queries[qi];
-    const name = q.name?.trim();
-    const template = name && name.includes('{{') ? name : undefined;
-    const parsed = parseInstant(res, template);
-    for (const s of parsed) {
-      // negative / NaN values cannot be drawn as a slice
-      if (s.value === null || s.value <= 0) continue;
-      let label = template ? s.label : shortLabel(s.metric);
-      if (name && !template) label = parsed.length > 1 ? `${name} ${shortLabel(s.metric)}` : name;
-      items.push({ label, value: s.value, explicit: parsed.length === 1 ? q.color : undefined });
-    }
-  });
+  for (const s of parseInstant(res, template)) {
+    // negative / NaN values cannot be drawn as a slice
+    if (s.value === null || s.value <= 0) continue;
+    items.push({ label: shortLabel(s.metric, template), value: s.value });
+  }
 
   const sort = opts.sort || 'desc';
   if (sort === 'desc') items.sort((a, b) => b.value - a.value);

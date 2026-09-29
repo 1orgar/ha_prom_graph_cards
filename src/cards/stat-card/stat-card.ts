@@ -29,7 +29,7 @@ export class StatCard extends BasePrometheusCard<StatCardConfig> {
   static getStubConfig(): Partial<StatCardConfig> {
     return {
       type: 'custom:prometheus-stat-card',
-      name: 'Targets up',
+      title: 'Targets up',
       query: 'sum(up)',
       icon: 'mdi:server-network',
       decimals: 0,
@@ -80,7 +80,7 @@ export class StatCard extends BasePrometheusCard<StatCardConfig> {
       history.push(reduceValues(this._items.map((it) => it.history[i] ?? null), mode));
     }
     const value = reduceValues(this._items.map((i) => i.value), mode);
-    return [{ label: this._config.name || '', value, history }];
+    return [{ label: this._title, value, history }];
   }
 
   private _color(item: StatItem, index: number, total: number): string {
@@ -119,20 +119,22 @@ export class StatCard extends BasePrometheusCard<StatCardConfig> {
 
   private _renderTiles(items: StatItem[]) {
     const c = this._config;
-    const list = items.length ? items : [{ label: c.name || '', value: null, history: [] }];
+    const list = items.length ? items : [{ label: '', value: null, history: [] }];
     const many = list.length > 1;
+    // tile height: explicit value, otherwise auto (fills a fixed-height panel, or 90px min)
     const style = [
       `--tile-min: ${c.tile_min_width || (many ? 140 : 200)}px`,
-      `--tile-height: ${c.tile_height || 110}px`,
+      c.tile_height ? `--tile-height: ${c.tile_height}px` : '',
       `--tile-font: ${many ? 28 : 40}px`
-    ].join(';');
+    ].filter(Boolean).join(';');
+    const sparkHeight = c.tile_height ? Math.round(c.tile_height * 0.4) : 40;
     return html`
       <ha-card>
-        ${c.name && many ? html`<div class="card-title">${c.name}</div>` : nothing}
-        <div class="tiles" style=${style}>
+        ${this.renderHeader()}
+        <div class="tiles ${c.tile_height ? '' : 'auto'} ${this._fixedHeight() ? 'fill' : ''}" style=${style}>
           ${list.map((item, i) => {
             const color = this._color(item, i, list.length);
-            const label = many ? item.label : c.name || item.label;
+            const label = many ? item.label : this._title ? '' : item.label;
             return html`
               <div class="tile" style="--tile-bg: ${this._tileBackground(color)}">
                 ${label ? html`<div class="tile-label" title=${label}>${label}</div>` : nothing}
@@ -142,7 +144,7 @@ export class StatCard extends BasePrometheusCard<StatCardConfig> {
                       .series=${[{ values: item.history, color: 'rgba(255,255,255,0.85)' }]}
                       .fill=${c.sparkline_fill !== false}
                       .lineWidth=${c.line_width ?? 2}
-                      .height=${Math.round((c.tile_height || 110) * 0.4)}
+                      .height=${sparkHeight}
                     ></prometheus-sparkline>`
                   : nothing}
               </div>
@@ -169,20 +171,18 @@ export class StatCard extends BasePrometheusCard<StatCardConfig> {
 
     return html`
       <ha-card>
-        <div class="stat-container">
+        ${this.renderHeader()}
+        <div class="stat-container ${this._fixedHeight() && !showSpark && single ? 'fill' : ''}">
           ${config.icon
             ? html`<div class="icon-container" style="--icon-color: ${mainColor}">
                 <ha-icon .icon=${config.icon}></ha-icon>
               </div>`
             : nothing}
-          <div class="info-container">
-            ${config.name ? html`<div class="name">${config.name}</div>` : nothing}
-            ${single ? html`<div class="value-container" style=${valueStyle}>${this._renderValue(main.value)}</div>` : nothing}
-          </div>
+          ${single ? html`<div class="value-container" style=${valueStyle}>${this._renderValue(main.value)}</div>` : nothing}
         </div>
         ${single ? nothing : this._renderRows(items)}
         ${showSpark
-          ? html`<prometheus-sparkline
+          ? html`<prometheus-sparkline class=${this._fixedHeight() ? 'fill' : ''}
               .series=${items.map((item, i) => ({ values: item.history, color: this._color(item, i, items.length) }))}
               .fill=${config.sparkline_fill !== false}
               .lineWidth=${config.line_width ?? 2}
@@ -193,12 +193,13 @@ export class StatCard extends BasePrometheusCard<StatCardConfig> {
     `;
   }
 
-  public getGridOptions() {
+  protected _defaultColumns(): number {
     const many = this._displayItems().length > 1;
-    return { columns: many || this._config?.layout === 'tiles' ? 6 : 3, rows: 'auto' as const, min_columns: 3 };
+    return many || this._config?.layout === 'tiles' ? 6 : 3;
   }
 
   public getCardSize(): number {
+    if (this._config?.card_height) return super.getCardSize();
     if (this._config?.layout === 'tiles') return 3;
     return 2 + Math.min(4, Math.max(0, this._displayItems().length - 1));
   }
