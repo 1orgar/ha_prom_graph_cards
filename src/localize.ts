@@ -218,7 +218,41 @@ const en: Dict = {
   source_local: 'Home Assistant PromQL alerts',
   min_active: 'Firing window (active for at least)',
   helper_min_active: 'e.g. 5m, 1h: alerts active for a shorter time are hidden. Empty = all',
-  group_by_name: 'One row per alert name'
+  group_by_name: 'One row per alert name',
+  // variables card
+  variables_name: 'Prometheus Variables',
+  variables_desc: 'Drop-downs ($instance, $job…) substituted into the queries of all cards',
+  section_variables: 'Variables',
+  helper_variables:
+    'Use in the queries of other cards as $name or ${name}; for several values: label=~"$name". Values are the label label_name of the query result (like label_values in Grafana) or a fixed list',
+  variable_n: 'Variable {n}',
+  add_variable: 'Add variable',
+  no_variables: 'Add a variable in the card editor',
+  var_all: 'All',
+  label: 'Label',
+  label_name: 'Label with the values',
+  regex: 'Regex filter',
+  values: 'Fixed values',
+  default: 'Default',
+  multi: 'Multiple values',
+  include_all: '"All" option',
+  layout_row: 'Row',
+  layout_column: 'Column',
+  // alerts from cards
+  create_alert: 'Create alert',
+  create_alert_title: 'New PromQL alert',
+  alert_name: 'Alert name',
+  alert_condition: 'Condition',
+  alert_threshold: 'Threshold',
+  alert_for: 'For',
+  alert_severity: 'Severity',
+  alert_created: 'Alert "{name}" created: {series} series, {active} firing now',
+  alert_admin_only: 'Only an administrator can create alerts',
+  cancel: 'Cancel',
+  silence: 'Silence',
+  silenced: 'Silenced',
+  silenced_until: 'silenced until {time}',
+  silence_done: 'Silence created in Alertmanager'
 };
 
 const ru: Dict = {
@@ -426,7 +460,41 @@ const ru: Dict = {
   source_local: 'PromQL-алерты Home Assistant',
   min_active: 'Окно срабатывания (активен не менее)',
   helper_min_active: 'например 5m, 1h: алерты, активные меньше, скрываются. Пусто = все',
-  group_by_name: 'Одна строка на имя алерта'
+  group_by_name: 'Одна строка на имя алерта',
+  // variables card
+  variables_name: 'Prometheus: переменные',
+  variables_desc: 'Выпадающие списки ($instance, $job…), подставляемые в запросы всех карточек',
+  section_variables: 'Переменные',
+  helper_variables:
+    'Используйте в запросах других карточек как $name или ${name}, для нескольких значений: label=~"$name". Значения — метка label_name из результата запроса (как label_values в Grafana) или фиксированный список',
+  variable_n: 'Переменная {n}',
+  add_variable: 'Добавить переменную',
+  no_variables: 'Добавьте переменную в редакторе карточки',
+  var_all: 'Все',
+  label: 'Подпись',
+  label_name: 'Метка со значениями',
+  regex: 'Regex-фильтр',
+  values: 'Фиксированные значения',
+  default: 'По умолчанию',
+  multi: 'Несколько значений',
+  include_all: 'Вариант «Все»',
+  layout_row: 'В строку',
+  layout_column: 'В столбец',
+  // alerts from cards
+  create_alert: 'Создать алерт',
+  create_alert_title: 'Новый PromQL-алерт',
+  alert_name: 'Имя алерта',
+  alert_condition: 'Условие',
+  alert_threshold: 'Порог',
+  alert_for: 'Длительность (for)',
+  alert_severity: 'Severity',
+  alert_created: 'Алерт «{name}» создан: {series} серий, сейчас срабатывает {active}',
+  alert_admin_only: 'Создавать алерты может только администратор',
+  cancel: 'Отмена',
+  silence: 'Заглушить',
+  silenced: 'Заглушён',
+  silenced_until: 'заглушён до {time}',
+  silence_done: 'Silence создан в Alertmanager'
 };
 
 const DICTS: Record<string, Dict> = { en, ru };

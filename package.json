@@ -1,6 +1,6 @@
 {
   "name": "ha_prom_graph_cards",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "Grafana-style Prometheus cards for Home Assistant dashboards",
   "license": "MIT",
   "repository": {

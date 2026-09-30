@@ -17,6 +17,10 @@ export class AlertsCardEditor extends BasePrometheusEditor<AlertsCardConfig> {
     };
   }
 
+  protected _canCreateAlert(): boolean {
+    return false;
+  }
+
   /** Alerts have their own severity colours. */
   protected _hasThresholds(): boolean {
     return false;

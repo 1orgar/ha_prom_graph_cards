@@ -24,6 +24,8 @@ export class PrometheusListEditor extends LitElement {
   /** server used for query autocomplete / test */
   @property({ attribute: false }) public entryId?: string;
   @property() public queryMode: 'instant' | 'range' = 'instant';
+  /** "Create alert" button of the item queries */
+  @property({ type: Boolean }) public queryAlerts = true;
 
   private _computeLabel = (schema: HaFormSchema): string => localize(schema.name, this.hass);
 
@@ -89,6 +91,7 @@ export class PrometheusListEditor extends LitElement {
                   .value=${(item.query as string) || ''}
                   .entryId=${this.entryId}
                   .mode=${this.queryMode}
+                  .alerts=${this.queryAlerts}
                   @value-changed=${(ev: CustomEvent) => {
                     ev.stopPropagation();
                     const items = [...this.items];

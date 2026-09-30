@@ -9,6 +9,7 @@ import './cards/bar-gauge-card/bar-gauge-card';
 import './cards/table-card/table-card';
 import './cards/heatmap-card/heatmap-card';
 import './cards/alerts-card/alerts-card';
+import './cards/variables-card/variables-card';
 import { localize } from './localize';
 
 declare const __VERSION__: string;
@@ -26,7 +27,8 @@ const CARDS = [
   { type: 'prometheus-bar-gauge-card', key: 'bargauge' },
   { type: 'prometheus-table-card', key: 'table' },
   { type: 'prometheus-heatmap-card', key: 'heatmap' },
-  { type: 'prometheus-alerts-card', key: 'alerts' }
+  { type: 'prometheus-alerts-card', key: 'alerts' },
+  { type: 'prometheus-variables-card', key: 'variables' }
 ];
 
 const w = window as any;

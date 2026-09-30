@@ -4,6 +4,7 @@ import { BaseCardConfig, HaFormSchema, HomeAssistant } from '../types';
 import { localize } from '../localize';
 import { cleanConfig, editorStyles, fireConfigChanged, loadHaComponents } from './editor-utils';
 import { migrateConfig } from '../utils/migrate';
+import { alertDraft } from './create-alert';
 import './list-editor';
 import './query-editor';
 
@@ -172,6 +173,8 @@ export abstract class BasePrometheusEditor<C extends BaseCardConfig> extends Lit
           .value=${(this._config as any)?.query || ''}
           .entryId=${(this._config as any)?.entry_id || undefined}
           .mode=${this._queryMode()}
+          .alerts=${this._canCreateAlert()}
+          .alertDefaults=${alertDraft(this._config as any)}
           @value-changed=${(ev: CustomEvent) => {
             ev.stopPropagation();
             this._updateConfig({ query: ev.detail.value } as unknown as Partial<C>);
@@ -183,6 +186,11 @@ export abstract class BasePrometheusEditor<C extends BaseCardConfig> extends Lit
     }
     flush();
     return html`${parts}`;
+  }
+
+  /** "Create alert" in the query editor (numeric cards; not for the alerts / variables cards). */
+  protected _canCreateAlert(): boolean {
+    return true;
   }
 
   /** Cards that run range queries test queries as range. */

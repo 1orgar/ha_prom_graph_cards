@@ -152,6 +152,19 @@ export const DEMO_CARDS = [
     config: { type: 'custom:prometheus-alerts-card', title: 'Alerts', show_labels: true }
   },
   {
+    // Dashboard variables: values of `instance` / `job` from `up`, used as $job / $instance in other cards
+    id: 'variables',
+    width: 560,
+    config: {
+      type: 'custom:prometheus-variables-card',
+      variables: [
+        { name: 'job', label: 'Job', query: 'up', label_name: 'job', default: 'node' },
+        { name: 'instance', label: 'Instance', query: 'up{job="$job"}', label_name: 'instance', include_all: true },
+        { name: 'range', label: 'Rate window', values: ['1m', '5m', '15m'], default: '5m' }
+      ]
+    }
+  },
+  {
     // Cards of one row with the same panel height (card_height) and identical titles
     id: 'row',
     width: 1000,

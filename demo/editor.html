@@ -33,7 +33,7 @@
     const lang = new URLSearchParams(location.search).get('lang') || 'en';
     const hass = createHass(lang);
     await import('../dist/ha_prom_graph_cards.js');
-    const cards = ['stat', 'gauge', 'timeseries', 'bar', 'state-timeline', 'pie', 'bar-gauge', 'table', 'heatmap', 'alerts'];
+    const cards = ['stat', 'gauge', 'timeseries', 'bar', 'state-timeline', 'pie', 'bar-gauge', 'table', 'heatmap', 'alerts', 'variables'];
     for (const t of cards) {
       const cls = customElements.get(`prometheus-${t}-card`);
       const ed = cls.getConfigElement();

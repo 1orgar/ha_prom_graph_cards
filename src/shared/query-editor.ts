@@ -7,6 +7,8 @@ import { suggest } from './query-suggest';
 import { QueryTestResult, testQuery } from './query-test';
 import { fireEvent } from './editor-utils';
 import { queryEditorStyles } from './query-editor-styles';
+import { PrometheusClient } from '../prometheus-client';
+import { ALERT_CONDITIONS, ALERT_SEVERITIES, AlertDraft, alertDraft, canCreateAlerts, CONDITION_LABELS } from './create-alert';
 
 type ActiveCtx = Exclude<CompletionContext, { kind: 'none' }>;
 
@@ -27,6 +29,13 @@ export class PrometheusQueryEditor extends LitElement {
   @state() private _active = 0;
   @state() private _test?: QueryTestResult;
   @state() private _testing = false;
+  /** "Create alert" button (PromQL alert of the integration from this query) */
+  @property({ type: Boolean }) public alerts = true;
+  /** prefill of the alert form (card title, first threshold) */
+  @property({ attribute: false }) public alertDefaults?: AlertDraft;
+  @state() private _alert?: AlertDraft;
+  @state() private _alertResult?: QueryTestResult;
+  @state() private _creating = false;
   @query('textarea') private _input!: HTMLTextAreaElement;
 
   private _ctx?: ActiveCtx;
@@ -113,6 +122,77 @@ export class PrometheusQueryEditor extends LitElement {
     this._testing = false;
   }
 
+  private _openAlert() {
+    this._alert = this._alert ? undefined : { ...(this.alertDefaults || alertDraft(undefined)) };
+    this._alertResult = undefined;
+  }
+
+  private _alertField(field: keyof AlertDraft, ev: Event) {
+    const raw = (ev.target as HTMLInputElement | HTMLSelectElement).value;
+    const value = field === 'threshold' ? (raw === '' ? undefined : Number(raw)) : raw;
+    this._alert = { ...this._alert!, [field]: value };
+  }
+
+  private async _createAlert() {
+    const a = this._alert;
+    if (!this.hass || !a || !a.name.trim() || !this.value?.trim()) return;
+    this._creating = true;
+    try {
+      const res = await new PrometheusClient(this.hass, this.entryId, false, false).createAlert({
+        name: a.name.trim(),
+        query: this.value.trim(),
+        condition: a.condition,
+        ...(a.condition !== 'any' && a.threshold !== undefined ? { threshold: a.threshold } : {}),
+        ...(a.for ? { for: a.for } : {}),
+        severity: a.severity
+      });
+      this._alertResult = {
+        ok: true,
+        text: localize('alert_created', this.hass, { name: a.name.trim(), series: res.series, active: res.active })
+      };
+      this._alert = undefined;
+    } catch (e: any) {
+      const text = e?.code === 'unauthorized' ? localize('alert_admin_only', this.hass) : e?.message || e?.code || String(e);
+      this._alertResult = { ok: false, text };
+    }
+    this._creating = false;
+  }
+
+  private _renderAlertForm() {
+    const a = this._alert;
+    if (!a) return nothing;
+    const l = (k: string) => localize(k, this.hass);
+    return html`<div class="alert-form" @keydown=${(e: Event) => e.stopPropagation()}>
+      <div class="alert-title">${l('create_alert_title')}</div>
+      <label class="wide">${l('alert_name')}
+        <input .value=${a.name} @input=${(e: Event) => this._alertField('name', e)} />
+      </label>
+      <label>${l('alert_condition')}
+        <select @change=${(e: Event) => this._alertField('condition', e)}>
+          ${ALERT_CONDITIONS.map((c) => html`<option value=${c} ?selected=${a.condition === c}>${CONDITION_LABELS[c]}</option>`)}
+        </select>
+      </label>
+      <label>${l('alert_threshold')}
+        <input type="number" step="any" .value=${a.threshold === undefined ? '' : String(a.threshold)}
+          ?disabled=${a.condition === 'any'} @input=${(e: Event) => this._alertField('threshold', e)} />
+      </label>
+      <label>${l('alert_for')}
+        <input .value=${a.for} placeholder="5m" @input=${(e: Event) => this._alertField('for', e)} />
+      </label>
+      <label>${l('alert_severity')}
+        <select @change=${(e: Event) => this._alertField('severity', e)}>
+          ${ALERT_SEVERITIES.map((s) => html`<option value=${s} ?selected=${a.severity === s}>${s}</option>`)}
+        </select>
+      </label>
+      <div class="alert-actions">
+        <button class="test-btn" ?disabled=${this._creating || !a.name.trim()} @click=${this._createAlert}>
+          ${l('create_alert')}
+        </button>
+        <button class="test-btn secondary" @click=${this._openAlert}>${l('cancel')}</button>
+      </div>
+    </div>`;
+  }
+
   private _renderPopup() {
     if (!this._items.length) return nothing;
     const kind = (k: Suggestion['kind']) => (k === 'aggregation' ? 'agg' : k === 'function' ? 'fn' : k);
@@ -145,6 +225,11 @@ export class PrometheusQueryEditor extends LitElement {
         <button class="test-btn" ?disabled=${this._testing || !this.value?.trim()} @click=${this._runTest}>
           ${this._testing ? localize('testing', this.hass) : localize('test_query', this.hass)}
         </button>
+        ${this.alerts && canCreateAlerts(this.hass)
+          ? html`<button class="test-btn" ?disabled=${!this.value?.trim()} @click=${this._openAlert}>
+              ${localize('create_alert', this.hass)}
+            </button>`
+          : nothing}
         <span class="hint">${localize('autocomplete_hint', this.hass)}</span>
       </div>
       ${t
@@ -152,6 +237,10 @@ export class PrometheusQueryEditor extends LitElement {
             ${t.text}
             ${t.samples?.length ? html`<ul>${t.samples.map((s) => html`<li><code>${s}</code></li>`)}</ul>` : nothing}
           </div>`
+        : nothing}
+      ${this._renderAlertForm()}
+      ${this._alertResult
+        ? html`<div class="result ${this._alertResult.ok ? 'ok' : 'err'}">${this._alertResult.text}</div>`
         : nothing}
     `;
   }

@@ -1,5 +1,6 @@
 import { HomeAssistant, PrometheusResponse, PrometheusEntry } from './types';
 import { demoCallWS } from './demo/demo-data';
+import { dashboardVariables, expandVariables } from './utils/variables';
 
 export interface PrometheusAlert {
   labels: Record<string, string>;
@@ -9,6 +10,9 @@ export interface PrometheusAlert {
   value?: string;
   /** `home_assistant` for PromQL alerts defined in the integration (not Prometheus rules) */
   source?: string;
+  /** matched by an active Alertmanager silence (backend with Alertmanager configured) */
+  silenced?: boolean;
+  silenced_until?: string;
 }
 
 export interface MetadataEntry {
@@ -28,10 +32,15 @@ export class PrometheusClient {
    * @param demo answer with built-in demo data instead of calling the backend
    *             (card previews in the "Add card" picker, README screenshots).
    */
+  /**
+   * @param variables substitute dashboard variables in queries (cards: yes; the variables card
+   *                  itself and the query test of the editor show the result with the current values too)
+   */
   constructor(
     private hass: HomeAssistant,
     public readonly entryId?: string,
-    public readonly demo = false
+    public readonly demo = false,
+    public readonly variables = true
   ) {}
 
   private _ws<T>(msg: Record<string, unknown>): Promise<T> {
@@ -51,12 +60,35 @@ export class PrometheusClient {
     return msg;
   }
 
+  /** Dashboard variables (`$instance`, `${job}`) of the variables card are substituted here. */
+  private _expand(query: string): string {
+    return this.variables ? expandVariables(query, dashboardVariables()) : query;
+  }
+
   async instantQuery(query: string, time?: number): Promise<PrometheusResponse> {
-    return this._ws<PrometheusResponse>(this._msg('query', { query, time }));
+    return this._ws<PrometheusResponse>(this._msg('query', { query: this._expand(query), time }));
   }
 
   async rangeQuery(query: string, start: number, end: number, step: string): Promise<PrometheusResponse> {
-    return this._ws<PrometheusResponse>(this._msg('query_range', { query, start, end, step }));
+    return this._ws<PrometheusResponse>(this._msg('query_range', { query: this._expand(query), start, end, step }));
+  }
+
+  /** PromQL alert (subentry of the integration) created from a card; admin only. */
+  async createAlert(alert: {
+    name: string;
+    query: string;
+    condition?: string;
+    threshold?: number;
+    for?: string;
+    severity?: string;
+    summary?: string;
+  }): Promise<{ entry_id: string; subentry_id: string; series: number; active: number }> {
+    return this._ws(this._msg('create_alert', { ...alert }));
+  }
+
+  /** Alertmanager silence for one alert series; admin only. */
+  async silence(labels: Record<string, string>, minutes?: number): Promise<{ silence_id: string }> {
+    return this._ws(this._msg('silence', { labels, minutes }));
   }
 
   async getLabels(): Promise<string[]> {

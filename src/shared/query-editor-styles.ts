@@ -117,4 +117,47 @@ export const queryEditorStyles = css`
     margin: 4px 0 0;
     padding-left: 16px;
   }
+  .test-btn.secondary {
+    color: var(--secondary-text-color);
+  }
+  .alert-form {
+    margin-top: 8px;
+    padding: 10px;
+    border: 1px solid var(--divider-color);
+    border-radius: 8px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 8px;
+  }
+  .alert-form .alert-title,
+  .alert-form .wide,
+  .alert-form .alert-actions {
+    grid-column: 1 / -1;
+  }
+  .alert-title {
+    font-weight: 500;
+    font-size: 13px;
+  }
+  .alert-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 11px;
+    color: var(--secondary-text-color);
+  }
+  .alert-form input,
+  .alert-form select {
+    font: inherit;
+    font-size: 13px;
+    color: var(--primary-text-color);
+    background: var(--mdc-text-field-fill-color, var(--secondary-background-color));
+    border: 1px solid var(--divider-color);
+    border-radius: 4px;
+    padding: 5px 6px;
+    min-width: 0;
+  }
+  .alert-actions {
+    display: flex;
+    gap: 8px;
+  }
 `;

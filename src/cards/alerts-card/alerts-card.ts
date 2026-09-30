@@ -3,7 +3,11 @@ import { customElement, state } from 'lit/decorators.js';
 import { BasePrometheusCard } from '../../shared/base-prometheus-card';
 import { cardStyles } from '../../shared/card-styles';
 import { BaseCardConfig } from '../../types';
-import type { PrometheusAlert } from '../../prometheus-client';
+import { PrometheusClient, type PrometheusAlert } from '../../prometheus-client';
+import { canCreateAlerts } from '../../shared/create-alert';
+
+/** Identity of one alert series (name + labels). */
+const alertKey = (a: PrometheusAlert) => JSON.stringify(Object.entries(a.labels).sort(([x], [y]) => x.localeCompare(y)));
 import { AlertFilter, filterAlerts, groupAlerts, severityColor, since } from './alerts-data';
 import { localize } from '../../localize';
 import './alerts-card-editor';
@@ -23,6 +27,9 @@ const HIDDEN_LABELS = new Set(['alertname', 'severity']);
 export class AlertsCard extends BasePrometheusCard<AlertsCardConfig> {
   @state() private _alerts: PrometheusAlert[] = [];
   @state() private _loaded = false;
+  @state() private _canSilence?: boolean;
+  @state() private _silencing: Record<string, boolean> = {};
+  @state() private _notice?: string;
 
   static get styles() {
     return [
@@ -42,6 +49,13 @@ export class AlertsCard extends BasePrometheusCard<AlertsCardConfig> {
         .summary { font-size: 12px; color: var(--primary-text-color); }
         .labels { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
         .label { font-size: 10px; padding: 1px 6px; border-radius: 6px; background: var(--card-background-color); color: var(--secondary-text-color); }
+        .alert.silenced { opacity: 0.6; }
+        .silence, .silenced { align-self: center; display: inline-flex; align-items: center; gap: 4px; font-size: 11px;
+          color: var(--secondary-text-color); white-space: nowrap; --mdc-icon-size: 16px; }
+        .silence { border: 1px solid var(--divider-color); background: none; border-radius: 12px; padding: 2px 8px;
+          cursor: pointer; font: inherit; font-size: 11px; color: var(--primary-color); }
+        .silence[disabled] { opacity: 0.5; cursor: default; }
+        .notice { font-size: 12px; color: var(--secondary-text-color); margin-top: 6px; }
         .ok { display: flex; align-items: center; gap: 8px; color: var(--success-color, #43a047); font-size: 14px; padding: 8px 0; }
       `
     ];
@@ -66,6 +80,7 @@ export class AlertsCard extends BasePrometheusCard<AlertsCardConfig> {
       this._loading = true;
       this._alerts = await this._client.getAlerts();
       this._error = undefined;
+      if (this._canSilence === undefined) this._canSilence = await this._alertmanagerConfigured();
     } catch (e: any) {
       this._error = this._formatError(e);
     } finally {
@@ -74,13 +89,54 @@ export class AlertsCard extends BasePrometheusCard<AlertsCardConfig> {
     }
   }
 
+  /** "Silence" buttons: admin + Alertmanager configured for the card's server. */
+  private async _alertmanagerConfigured(): Promise<boolean> {
+    if (this._client.demo || !canCreateAlerts(this._hass)) return false;
+    try {
+      const entries = await PrometheusClient.getEntries(this._hass!);
+      const entry = this._config.entry_id ? entries.find((e) => e.entry_id === this._config.entry_id) : entries.find((e) => e.loaded !== false);
+      return Boolean(entry?.alertmanager);
+    } catch {
+      return false;
+    }
+  }
+
+  private async _silence(a: PrometheusAlert, ev: Event) {
+    ev.stopPropagation();
+    const key = alertKey(a);
+    this._silencing = { ...this._silencing, [key]: true };
+    try {
+      await this._client.silence(a.labels);
+      this._alerts = this._alerts.map((x) => (alertKey(x) === key ? { ...x, silenced: true } : x));
+      this._notice = localize('silence_done', this._hass);
+    } catch (e: any) {
+      this._notice = this._formatError(e);
+    }
+    this._silencing = { ...this._silencing, [key]: false };
+  }
+
+  private _renderSilence(a: PrometheusAlert, count: number) {
+    if (a.silenced) {
+      const until = a.silenced_until ? new Date(a.silenced_until) : undefined;
+      const time = until && !Number.isNaN(until.getTime()) ? until.toLocaleString(this._hass?.locale?.language) : '';
+      return html`<span class="silenced" title=${time ? localize('silenced_until', this._hass, { time }) : ''}>
+        <ha-icon icon="mdi:bell-off-outline"></ha-icon>${localize('silenced', this._hass)}
+      </span>`;
+    }
+    // a grouped row stands for several series: silence per series only
+    if (!this._canSilence || count > 1 || a.state === 'inactive') return nothing;
+    return html`<button class="silence" ?disabled=${this._silencing[alertKey(a)]} @click=${(e: Event) => this._silence(a, e)}>
+      <ha-icon icon="mdi:bell-off-outline"></ha-icon>${localize('silence', this._hass)}
+    </button>`;
+  }
+
   private _renderAlert(a: PrometheusAlert, count = 1, showLabels = false) {
     const c = this._config;
     const sev = a.labels.severity;
     const summary = a.annotations?.summary || a.annotations?.description;
     const labels = Object.entries(a.labels).filter(([k]) => !HIDDEN_LABELS.has(k));
     return html`
-      <div class="alert ${a.state}" style="--sev:${severityColor(sev)}">
+      <div class="alert ${a.state} ${a.silenced ? 'silenced' : ''}" style="--sev:${severityColor(sev)}">
         <div class="body">
           <div class="title">
             <span class="alertname" title=${a.labels.alertname}>${a.labels.alertname}</span>
@@ -95,6 +151,7 @@ export class AlertsCard extends BasePrometheusCard<AlertsCardConfig> {
             ? html`<div class="labels">${labels.map(([k, v]) => html`<span class="label">${k}=${v}</span>`)}</div>`
             : nothing}
         </div>
+        ${this._renderSilence(a, count)}
       </div>
     `;
   }
@@ -120,6 +177,7 @@ export class AlertsCard extends BasePrometheusCard<AlertsCardConfig> {
               ${rows.map((r) => this._renderAlert(r.alert, r.count, (perName.get(r.alert.labels.alertname) || 0) > 1))}
             </div>`
           : html`<div class="ok"><ha-icon icon="mdi:check-circle"></ha-icon>${localize('no_alerts', this._hass)}</div>`}
+        ${this._notice ? html`<div class="notice">${this._notice}</div>` : nothing}
       </ha-card>
     `;
   }

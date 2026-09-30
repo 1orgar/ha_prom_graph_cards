@@ -27,11 +27,16 @@ Grafana-style dashboard cards for Home Assistant, powered by PromQL.
 | **Bar Chart** ![Bar chart](https://raw.githubusercontent.com/1orgar/ha_prom_graph_cards/main/images/bar.png) | **Pie / Donut** ![Pie](https://raw.githubusercontent.com/1orgar/ha_prom_graph_cards/main/images/pie.png) |
 | **Table** ![Table](https://raw.githubusercontent.com/1orgar/ha_prom_graph_cards/main/images/table.png) | **Alerts** ![Alerts](https://raw.githubusercontent.com/1orgar/ha_prom_graph_cards/main/images/alerts.png) |
 | **Heatmap** ![Heatmap](https://raw.githubusercontent.com/1orgar/ha_prom_graph_cards/main/images/heatmap.png) | **Card picker** (built-in demo data) ![Card picker](https://raw.githubusercontent.com/1orgar/ha_prom_graph_cards/main/images/card-picker.png) |
+| **Variables** ![Variables](https://raw.githubusercontent.com/1orgar/ha_prom_graph_cards/main/images/variables.png) | |
 
 ## ✨ Features
 
-- 📊 **10 cards** — Stat (value or Grafana-like gradient tiles), Gauge, Bar Gauge, Time Series (uPlot), Bar Chart,
-  State Timeline, Pie / Donut, Table, Heatmap, Alerts list
+- 📊 **11 cards** — Stat (value or Grafana-like gradient tiles), Gauge, Bar Gauge, Time Series (uPlot), Bar Chart,
+  State Timeline, Pie / Donut, Table, Heatmap, Alerts list, Variables
+- 🎛️ **Dashboard variables** — Grafana-like drop-downs (`$instance`, `${job}`) substituted into the queries of all cards
+- 🔔 **Create alert from a card** — a PromQL alert of the integration from the panel query and threshold;
+  **Silence** alerts in Alertmanager from the Alerts card
+- 💤 Cards outside the screen are not polled; they refresh when scrolled into view
 - 🧱 **Same editor layout everywhere** — Panel / Query / Display / Thresholds, one query per panel
 - 📐 **Equal panel heights** — identical titles, `card_height` or the Sections rows; auto height when empty
 - ⌨️ **PromQL editor** — autocomplete for metrics, functions, labels and label values + **Test query** button
@@ -79,9 +84,44 @@ Everything is configured in the visual editor.
 | Prometheus Table | `custom:prometheus-table-card` |
 | Prometheus Heatmap | `custom:prometheus-heatmap-card` |
 | Prometheus Alerts | `custom:prometheus-alerts-card` |
+| Prometheus Variables | `custom:prometheus-variables-card` |
 
 In any query field press **Ctrl+Space** for suggestions (they also appear while typing) and
 **Test query** to see the number of returned series, sample labels or the PromQL error.
+
+**Create alert** (admins, backend v0.6+) turns the query into a PromQL alert of the integration: name = panel title,
+threshold = the first threshold above the base one; condition, `for` and severity can be changed before saving.
+The alert appears on the integration page and in the Alerts card. With Alertmanager configured in the integration,
+the Alerts card shows a **Silence** button per series and marks silenced alerts.
+
+### Dashboard variables
+
+Add a **Prometheus Variables** card and use the variables in the queries of any card on the page:
+
+```yaml
+type: custom:prometheus-variables-card
+variables:
+  - name: job
+    query: up                 # values = label `label_name` of the result (like Grafana label_values)
+    label_name: job
+  - name: instance
+    query: up{job="$job"}     # chained: reloads when $job changes
+    label_name: instance
+    multi: true
+    include_all: true
+  - name: window
+    values: [1m, 5m, 15m]     # fixed list
+    default: 5m
+```
+
+```promql
+rate(node_network_receive_bytes_total{instance=~"$instance"}[$window])
+```
+
+- `$name` and `${name}` are replaced; several values (or **All**) become `a|b|c` — use them with `=~`.
+  Values inside `=~"…"` are regex-escaped.
+- A change refetches only the cards that use the variable. The selection is remembered in the browser.
+- Optional `regex` filters the values (the first capture group is used), `layout: column` stacks the drop-downs.
 
 ### Editor layout
 

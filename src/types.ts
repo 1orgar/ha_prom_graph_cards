@@ -7,6 +7,7 @@ export interface HomeAssistant {
   locale: { language: string; number_format: string };
   states: Record<string, HassEntity>;
   config: { unit_system: { temperature: string; length: string; mass: string; volume: string } };
+  user?: { is_admin: boolean; name?: string };
 }
 
 // Schema for <ha-form> (subset used by the editors)
@@ -69,6 +70,9 @@ export interface PrometheusEntry {
   entry_id: string;
   name: string;
   url: string;
+  loaded?: boolean;
+  /** Alertmanager configured (backend v0.6+): the Alerts card offers "Silence" */
+  alertmanager?: boolean;
 }
 
 export const INTEGRATION_DOMAIN = 'prometheus_dashboard';
